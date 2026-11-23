@@ -24,9 +24,14 @@ async function buildQrPayload(
   const rawToken = decryptSecret(qr.tokenEncrypted);
   const activeCode = await AccessCode.findOne({ hostelId, status: 'ACTIVE' }).lean();
   const baseUrl = `${env.QR_BASE_URL.replace(/\/$/, '')}/${rawToken}`;
-  const qrUrl = activeCode
-    ? `${baseUrl}?code=${encodeURIComponent(decryptSecret(activeCode.codeEncrypted))}`
-    : baseUrl;
+  let qrUrl = baseUrl;
+  if (activeCode) {
+    try {
+      qrUrl = `${baseUrl}?code=${encodeURIComponent(decryptSecret(activeCode.codeEncrypted))}`;
+    } catch {
+      qrUrl = baseUrl;
+    }
+  }
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 400, margin: 2 });
   return {
     id: qr._id,
@@ -71,8 +76,12 @@ router.get('/qr', async (req, res, next) => {
       res.json({ qr: null });
       return;
     }
-    const payload = await buildQrPayload(hostelId, activeQr);
-    res.json({ qr: payload });
+    try {
+      const payload = await buildQrPayload(hostelId, activeQr);
+      res.json({ qr: payload });
+    } catch {
+      res.json({ qr: null });
+    }
   } catch (err) {
     next(err);
   }
@@ -157,15 +166,19 @@ router.get('/access-code', async (req, res, next) => {
       return;
     }
 
-    res.json({
-      accessCode: {
-        id: activeCode._id,
-        code: decryptSecret(activeCode.codeEncrypted),
-        status: activeCode.status,
-        createdAt: activeCode.createdAt,
-        expiresAt: activeCode.expiresAt,
-      },
-    });
+    try {
+      res.json({
+        accessCode: {
+          id: activeCode._id,
+          code: decryptSecret(activeCode.codeEncrypted),
+          status: activeCode.status,
+          createdAt: activeCode.createdAt,
+          expiresAt: activeCode.expiresAt,
+        },
+      });
+    } catch {
+      res.json({ accessCode: null });
+    }
   } catch (err) {
     next(err);
   }
