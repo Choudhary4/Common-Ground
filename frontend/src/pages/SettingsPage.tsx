@@ -9,6 +9,9 @@ import {
   CheckCircle,
   Sparkle,
   Prohibit,
+  PencilSimple,
+  X,
+  Check,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { Avatar, PRESET_AVATARS } from '../components/Avatar';
@@ -36,6 +39,12 @@ export function SettingsPage() {
   const [nickname, setNickname] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
   const [interestsText, setInterestsText] = useState('');
+  const [savedProfile, setSavedProfile] = useState<{
+    nickname: string;
+    avatar: string | null;
+    interestsText: string;
+  }>({ nickname: '', avatar: null, interestsText: '' });
+  const [isEditing, setIsEditing] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<Array<{ _id: string; nickname: string }>>([]);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -55,8 +64,21 @@ export function SettingsPage() {
     }>('/traveller/settings');
     setNickname(res.nickname);
     setAvatar(res.avatar ?? null);
-    setInterestsText(res.interests.join(', '));
+    const joinedInterests = res.interests.join(', ');
+    setInterestsText(joinedInterests);
+    setSavedProfile({
+      nickname: res.nickname,
+      avatar: res.avatar ?? null,
+      interestsText: joinedInterests,
+    });
     setBlockedUsers(res.blockedUsers);
+  };
+
+  const cancelEdit = () => {
+    setNickname(savedProfile.nickname);
+    setAvatar(savedProfile.avatar);
+    setInterestsText(savedProfile.interestsText);
+    setIsEditing(false);
   };
 
   useEffect(() => {
@@ -108,12 +130,18 @@ export function SettingsPage() {
     setSavedMsg(null);
     try {
       const interests = currentInterests.slice(0, 5);
+      const cleanNick = nickname.trim();
       await apiRequest('/traveller/settings', {
         method: 'PATCH',
-        body: JSON.stringify({ nickname: nickname.trim(), avatar, interests }),
+        body: JSON.stringify({ nickname: cleanNick, avatar, interests }),
       });
       await refreshAuth();
-      setSavedMsg('Profile preferences saved!');
+      const joinedInterests = interests.join(', ');
+      setNickname(cleanNick);
+      setInterestsText(joinedInterests);
+      setSavedProfile({ nickname: cleanNick, avatar, interestsText: joinedInterests });
+      setIsEditing(false);
+      setSavedMsg('Profile updated!');
     } finally {
       setSaving(false);
     }
@@ -171,125 +199,235 @@ export function SettingsPage() {
     <TravellerLayout>
       <div className="space-y-4">
         {/* Profile Header Card */}
-        <div className="rounded-2xl bg-[#14241E] text-white p-5 shadow-sm border border-emerald-500/20 flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-300 p-0.5 shrink-0">
-            <Avatar
-              src={avatar}
-              name={nickname || user?.nickname || initials}
-              className="w-full h-full rounded-[14px]"
-            />
+        <div className="rounded-2xl bg-[#14241E] text-white p-5 shadow-sm border border-emerald-500/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-300 p-0.5 shrink-0">
+              <Avatar
+                src={avatar}
+                name={nickname || user?.nickname || initials}
+                className="w-full h-full rounded-[14px]"
+              />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold truncate">{nickname || user?.nickname}</h1>
+              {user?.hostelName && (
+                <p className="text-xs text-emerald-200/80 flex items-center gap-1 mt-0.5">
+                  <MapPin weight="fill" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">{user.hostelName}</span>
+                </p>
+              )}
+              <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full bg-white/10 text-emerald-200 text-[10px] font-bold">
+                Active 72h Traveller Session
+              </span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="text-lg font-extrabold truncate">{nickname || user?.nickname}</h1>
-            {user?.hostelName && (
-              <p className="text-xs text-emerald-200/80 flex items-center gap-1 mt-0.5">
-                <MapPin weight="fill" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate">{user.hostelName}</span>
-              </p>
-            )}
-            <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full bg-white/10 text-emerald-200 text-[10px] font-bold">
-              Active 72h Traveller Session
-            </span>
-          </div>
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => {
+                setSavedMsg(null);
+                setIsEditing(true);
+              }}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-emerald-200 text-xs font-bold transition active:scale-95"
+            >
+              <PencilSimple weight="bold" className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
         </div>
 
-        {/* Profile Form */}
-        <form
-          onSubmit={handleSave}
-          className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-5 space-y-4 shadow-xs"
-        >
-          <div className="flex items-center gap-2">
-            <Sparkle weight="duotone" className="w-4 h-4 text-[#a93017]" />
-            <h2 className="text-sm font-extrabold text-[#111c2d]">Traveller Profile</h2>
+        {savedMsg && !isEditing && (
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+            <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600 shrink-0" />
+            {savedMsg}
           </div>
+        )}
 
-          {savedMsg && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-              <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600" />
-              {savedMsg}
+        {/* Profile View Mode vs Separate Edit Mode */}
+        {!isEditing ? (
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkle weight="duotone" className="w-4 h-4 text-[#a93017]" />
+                <h2 className="text-sm font-extrabold text-[#111c2d]">Traveller Profile</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedMsg(null);
+                  setIsEditing(true);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] text-[11px] font-bold transition"
+              >
+                <PencilSimple weight="bold" className="w-3 h-3" />
+                Edit Profile
+              </button>
             </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-bold text-[#111c2d] mb-2">Choose Your Avatar</label>
-            <div className="grid grid-cols-6 gap-2">
-              {PRESET_AVATARS.map((url) => {
-                const selected = avatar === url;
-                return (
-                  <button
-                    key={url}
-                    type="button"
-                    onClick={() => setAvatar(selected ? null : url)}
-                    className={`rounded-2xl p-0.5 transition active:scale-95 ${
-                      selected
-                        ? 'ring-2 ring-[#a93017] bg-[#ffdad3]/40'
-                        : 'hover:ring-2 hover:ring-slate-300'
-                    }`}
-                  >
-                    <img src={url} alt="Avatar option" className="w-full aspect-square rounded-xl" />
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-1 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/25">
+                <p className="text-[10px] font-bold text-[#59413c] uppercase tracking-wider">
+                  Nickname
+                </p>
+                <p className="text-sm font-bold text-[#111c2d] mt-0.5">
+                  {nickname || user?.nickname}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/25">
+                <p className="text-[10px] font-bold text-[#59413c] uppercase tracking-wider mb-1.5">
+                  Interests
+                </p>
+                {currentInterests.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {currentInterests.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2.5 py-1 rounded-full bg-white border border-[#e0bfb8]/40 text-[#111c2d] text-xs font-semibold"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#59413c]">
+                    No interests added yet. Tap <span className="font-bold text-[#a93017]">Edit Profile</span> to pick your vibe!
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#111c2d] mb-1.5">Nickname</label>
-            <input
-              type="text"
-              required
-              minLength={2}
-              maxLength={40}
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
-              Interests (up to 5)
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
-              {SUGGESTED_INTERESTS.map((tag) => {
-                const selected = currentInterests.some(
-                  (t) => t.toLowerCase() === tag.toLowerCase()
-                );
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleSuggestedInterest(tag)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition ${
-                      selected
-                        ? 'bg-[#14241E] text-white'
-                        : 'bg-[#f0f3ff] text-[#59413c] hover:bg-[#e7eeff]'
-                    }`}
-                  >
-                    {selected ? '✓ ' : '+ '}
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-            <input
-              type="text"
-              value={interestsText}
-              onChange={(e) => setInterestsText(e.target.value)}
-              placeholder="Chai, Photography, Board Games"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full h-11 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-[0.98] text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-xs transition disabled:opacity-60"
+        ) : (
+          <form
+            onSubmit={handleSave}
+            className="bg-white rounded-2xl border-2 border-[#a93017]/25 p-5 space-y-4 shadow-sm"
           >
-            {saving && <CircleNotch className="w-4 h-4 animate-spin" />}
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </form>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <PencilSimple weight="duotone" className="w-4 h-4 text-[#a93017]" />
+                <h2 className="text-sm font-extrabold text-[#111c2d]">Edit Profile</h2>
+              </div>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Cancel editing"
+              >
+                <X weight="bold" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-[#111c2d]">Choose Your Avatar</label>
+                {avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatar(null)}
+                    className="text-[11px] font-bold text-[#59413c] hover:text-[#a93017]"
+                  >
+                    Use initials
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+                {PRESET_AVATARS.map((url) => {
+                  const selected = avatar === url;
+                  return (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => setAvatar(selected ? null : url)}
+                      className={`relative rounded-2xl p-1 transition active:scale-95 ${
+                        selected
+                          ? 'ring-2 ring-[#a93017] bg-[#ffdad3]/40'
+                          : 'bg-[#f9f9ff] hover:ring-2 hover:ring-slate-300'
+                      }`}
+                    >
+                      <img
+                        src={url}
+                        alt="Avatar option"
+                        className="w-full aspect-square rounded-xl"
+                      />
+                      {selected && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#a93017] text-white flex items-center justify-center shadow-xs">
+                          <Check weight="bold" className="w-3 h-3" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111c2d] mb-1.5">Nickname</label>
+              <input
+                type="text"
+                required
+                minLength={2}
+                maxLength={40}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
+                Interests (up to 5)
+              </label>
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {SUGGESTED_INTERESTS.map((tag) => {
+                  const selected = currentInterests.some(
+                    (t) => t.toLowerCase() === tag.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleSuggestedInterest(tag)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition ${
+                        selected
+                          ? 'bg-[#14241E] text-white'
+                          : 'bg-[#f0f3ff] text-[#59413c] hover:bg-[#e7eeff]'
+                      }`}
+                    >
+                      {selected ? '✓ ' : '+ '}
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="text"
+                value={interestsText}
+                onChange={(e) => setInterestsText(e.target.value)}
+                placeholder="Chai, Photography, Board Games"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={saving}
+                className="flex-1 h-11 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] text-xs font-bold transition disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 h-11 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-[0.98] text-white text-xs font-bold inline-flex items-center justify-center gap-2 shadow-xs transition disabled:opacity-60"
+              >
+                {saving && <CircleNotch className="w-4 h-4 animate-spin" />}
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Mobile Push Notifications */}
         <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 space-y-2.5 shadow-xs">
