@@ -267,6 +267,23 @@ router.post('/invite', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), actionRateLim
   }
 });
 
+router.delete('/invite/:targetUserId', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const escapedNick = req.auth!.nickname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await Notification.deleteMany({
+      hostelId,
+      userId: req.params.targetUserId,
+      type: 'ACTIVITY_INVITE',
+      message: { $regex: `^${escapedNick} invited` },
+    });
+    emitToUser(req.params.targetUserId, 'notification:new', {});
+    res.json({ message: 'Invitation cancelled' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/notifications', async (req, res, next) => {
   try {
     const notifications = await Notification.find({

@@ -67,6 +67,7 @@ export function DiscoverTravellersPage() {
   const [inviteTarget, setInviteTarget] = useState<OptedInTraveller | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [cancellingInviteId, setCancellingInviteId] = useState<string | null>(null);
 
   const [blockTarget, setBlockTarget] = useState<OptedInTraveller | null>(null);
   const [blocking, setBlocking] = useState(false);
@@ -132,6 +133,27 @@ export function DiscoverTravellersPage() {
       setFeedback(err instanceof ApiError ? err.message : 'Could not send invite');
     } finally {
       setSendingInvite(false);
+    }
+  };
+
+  const cancelInvite = async (target: OptedInTraveller) => {
+    setCancellingInviteId(target.userId);
+    setFeedback(null);
+    try {
+      await apiRequest(`/traveller/invite/${target.userId}`, { method: 'DELETE' });
+      setInvitedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(target.userId);
+        return next;
+      });
+      setTravellers((prev) =>
+        prev.map((t) => (t.userId === target.userId ? { ...t, invited: false } : t))
+      );
+      setFeedback(`Cancelled invite to ${target.nickname}.`);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : 'Could not cancel invite');
+    } finally {
+      setCancellingInviteId(null);
     }
   };
 
@@ -308,10 +330,21 @@ export function DiscoverTravellersPage() {
                     <div className="flex items-center gap-1 shrink-0">
                       {myOpenActivities.length > 0 &&
                         (isInvited ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                            <CheckCircle weight="fill" className="w-3.5 h-3.5 text-emerald-600" />
-                            Invited
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => cancelInvite(t)}
+                            disabled={cancellingInviteId === t.userId}
+                            title="Tap to cancel invite"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-rose-50 border border-emerald-200 hover:border-rose-200 text-emerald-800 hover:text-rose-700 text-xs font-bold transition active:scale-95 disabled:opacity-60"
+                          >
+                            {cancellingInviteId === t.userId ? (
+                              <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle weight="fill" className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span>{cancellingInviteId === t.userId ? 'Cancelling...' : 'Invited'}</span>
+                            {cancellingInviteId !== t.userId && <X weight="bold" className="w-3 h-3 opacity-60" />}
+                          </button>
                         ) : (
                           <button
                             onClick={() => setInviteTarget(t)}
