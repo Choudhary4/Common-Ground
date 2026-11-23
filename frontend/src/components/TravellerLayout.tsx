@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, Users, PlusCircle, CalendarCheck, Bell, Settings, MapPin, BellRing, X } from 'lucide-react';
+import { Radar, Users, PlusCircle, CalendarCheck, Bell, BellRing, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
@@ -80,78 +80,86 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname]);
 
   const navItems = [
-    { to: '/app', label: 'Feed', icon: Compass },
+    { to: '/app', label: 'Radar', icon: Radar },
     { to: '/app/discover', label: 'Travellers', icon: Users },
     { to: '/app/activities/new', label: 'Host', icon: PlusCircle },
-    { to: '/app/my-activities', label: 'Mine', icon: CalendarCheck },
+    { to: '/app/my-activities', label: 'My Plans', icon: CalendarCheck },
   ];
 
+  const initials = (user?.nickname ?? 'CG')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF7F2]">
-      <header className="sticky top-0 z-30 bg-[#FAF7F2]/95 backdrop-blur border-b border-amber-200/70">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/app" className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-[#E85D3F] text-white font-bold flex items-center justify-center text-sm shadow-sm">
-              CG
+    <div className="min-h-screen flex flex-col bg-[#f9f9ff] text-[#111c2d]">
+      <header className="sticky top-0 z-40 bg-[#f9f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+          <Link
+            to="/app"
+            className="h-9 px-3 bg-[#14241E] rounded-full flex items-center gap-2 shadow-sm border border-emerald-500/20"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-bold tracking-wider text-emerald-100 uppercase">
+              goSTOPS
             </span>
-            <div>
-              <p className="text-sm font-bold text-slate-900 leading-tight">Common Ground</p>
-              {user?.hostelName && (
-                <p className="text-[11px] text-[#D94E32] font-medium flex items-center gap-0.5 leading-tight">
-                  <MapPin className="w-3 h-3" /> {user.hostelName}
-                </p>
-              )}
-            </div>
+            <span className="text-[10px] text-emerald-400 font-semibold">✕</span>
+            <span className="text-[11px] font-extrabold tracking-tight text-white">
+              COMMON GROUND
+            </span>
           </Link>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/app/notifications')}
-              className="relative p-2 rounded-xl hover:bg-amber-100/70 text-slate-700 transition"
+              className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] transition-colors text-[#111c2d] border border-[#e0bfb8]/40"
               aria-label="Notifications"
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-[18px] h-[18px]" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#E85D3F] text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#a93017] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
             <button
               onClick={() => navigate('/app/settings')}
-              className="p-2 rounded-xl hover:bg-amber-100/70 text-slate-700 transition"
-              aria-label="Settings"
+              className="relative w-9 h-9 rounded-full bg-[#14241E] text-emerald-100 font-bold text-xs flex items-center justify-center ring-2 ring-emerald-500/30 shadow-sm"
+              aria-label="Profile & Settings"
+              title={user?.nickname}
             >
-              <Settings className="w-5 h-5" />
+              {initials}
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5 pb-24">
+      <main className="flex-1 max-w-md w-full mx-auto px-4 pt-3 pb-28">
         {showPushPrompt && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-white border border-amber-200/80 flex items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <BellRing className="w-5 h-5 text-[#E85D3F] shrink-0" />
-              <p className="text-xs text-slate-700">
-                <strong className="text-slate-900">Get mobile alerts</strong> when someone invites
-                you or joins your activity.
+          <div className="mb-3 p-3 rounded-2xl bg-white border border-[#e0bfb8]/40 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2">
+              <BellRing className="w-4 h-4 text-[#a93017] shrink-0" />
+              <p className="text-[11px] text-[#59413c]">
+                <strong className="text-[#111c2d]">Mobile alerts</strong> for invites &amp; joins
               </p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={handleEnablePush}
                 disabled={enablingPush}
-                className="px-3 py-1.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold disabled:opacity-60"
+                className="px-2.5 py-1 rounded-full bg-[#a93017] text-white text-[11px] font-bold disabled:opacity-60"
               >
-                {enablingPush ? 'Enabling...' : 'Enable'}
+                {enablingPush ? '...' : 'Enable'}
               </button>
               <button
                 onClick={dismissPush}
                 className="p-1 text-slate-400 hover:text-slate-600"
                 aria-label="Dismiss"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -163,8 +171,8 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
         <Footer />
       </div>
 
-      <nav className="fixed bottom-3 inset-x-0 z-30 px-4 pointer-events-none">
-        <div className="pointer-events-auto max-w-md mx-auto grid grid-cols-4 h-14 rounded-full bg-white/90 backdrop-blur-md border border-amber-200/80 shadow-lg px-2">
+      <nav className="fixed bottom-4 left-4 right-4 z-50 max-w-md mx-auto">
+        <div className="bg-[#14241E]/95 backdrop-blur-xl border border-emerald-500/20 text-white rounded-full px-3 py-2 shadow-2xl flex items-center justify-around">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to;
@@ -172,12 +180,17 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold rounded-full transition ${
-                  active ? 'text-[#E85D3F]' : 'text-slate-500 hover:text-slate-800'
+                className={`flex flex-col items-center justify-center relative py-1 px-3 transition-all ${
+                  active ? 'text-emerald-400' : 'text-emerald-100/65 hover:text-white'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${active ? 'stroke-[2.5]' : ''}`} />
-                <span>{item.label}</span>
+                <div className="relative flex items-center justify-center">
+                  <Icon className="w-5 h-5" />
+                  {active && (
+                    <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  )}
+                </div>
+                <span className="text-[10px] font-bold tracking-tight mt-0.5">{item.label}</span>
               </Link>
             );
           })}

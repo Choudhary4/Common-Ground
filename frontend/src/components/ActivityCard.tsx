@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Lock, Award, Loader2, Stamp } from 'lucide-react';
+import {
+  MapPin,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  Coffee,
+  Gamepad2,
+  Compass,
+  Utensils,
+  Sparkles,
+  Hand,
+} from 'lucide-react';
 import { apiRequest } from '../lib/api';
 
 export interface ActivitySummary {
@@ -22,6 +33,14 @@ export interface ActivitySummary {
   hasPendingRequest?: boolean;
 }
 
+const CATEGORY_ICON: Record<string, typeof Coffee> = {
+  SOCIAL: Coffee,
+  GAMES: Gamepad2,
+  EXPLORATION: Compass,
+  FOOD: Utensils,
+  OTHER: Sparkles,
+};
+
 export function ActivityCard({
   activity,
   onJoined,
@@ -31,8 +50,16 @@ export function ActivityCard({
 }) {
   const [joining, setJoining] = useState(false);
   const [quickJoined, setQuickJoined] = useState(false);
+  const [requested, setRequested] = useState(false);
+
   const isOfficial = activity.creatorType === 'HOSTEL_MANAGER';
   const spotsLeft = Math.max(0, activity.maxParticipants - activity.confirmedCount);
+  const pct = Math.min(
+    100,
+    Math.round((activity.confirmedCount / Math.max(1, activity.maxParticipants)) * 100)
+  );
+  const CatIcon = CATEGORY_ICON[activity.category] ?? Sparkles;
+
   const start = new Date(activity.scheduledAt);
   const timeLabel = start.toLocaleString([], {
     month: 'short',
@@ -41,136 +68,148 @@ export function ActivityCard({
     minute: '2-digit',
   });
 
-  const handleQuickJoin = async (e: React.MouseEvent) => {
+  const handleQuickAction = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setJoining(true);
     try {
-      await apiRequest(`/activities/${activity._id}/join`, { method: 'POST' });
-      setQuickJoined(true);
+      const res = await apiRequest<{ joined: boolean }>(`/activities/${activity._id}/join`, {
+        method: 'POST',
+      });
+      if (res.joined) setQuickJoined(true);
+      else setRequested(true);
       onJoined?.();
     } finally {
       setJoining(false);
     }
   };
 
-  const statusStyles: Record<string, string> = {
-    OPEN: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    FULL: 'bg-amber-50 text-amber-800 border-amber-200',
-    CANCELLED: 'bg-rose-50 text-rose-700 border-rose-200',
-    COMPLETED: 'bg-slate-100 text-slate-600 border-slate-200',
-    EXPIRED: 'bg-slate-100 text-slate-500 border-slate-200',
-  };
-
-  const maxDots = Math.min(activity.maxParticipants, 10);
-  const filledDots = Math.min(
-    maxDots,
-    Math.round((activity.confirmedCount / activity.maxParticipants) * maxDots)
-  );
+  const isJoinedNow = activity.isJoined || quickJoined;
+  const isPendingNow = activity.hasPendingRequest || requested;
 
   return (
     <Link
       to={`/app/activities/${activity._id}`}
-      className={`block relative bg-white rounded-3xl border transition hover:shadow-md overflow-hidden ${
-        isOfficial ? 'border-[#E85D3F]/45 ring-1 ring-[#E85D3F]/10' : 'border-amber-200/80'
-      }`}
+      className="block bg-white rounded-2xl p-4 shadow-sm border border-[#e0bfb8]/35 relative overflow-hidden transition hover:shadow-md"
     >
-      <div className="p-4 sm:p-5 pb-3.5">
-        <div className="flex items-start justify-between gap-2 mb-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {isOfficial && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-[#FFF0EC] text-[#D94E32] border border-[#E85D3F]/25">
-                <Award className="w-3 h-3" /> Official Hostel Pass
-              </span>
-            )}
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-900">
-              {activity.category}
-            </span>
-            {activity.joinMode === 'APPROVAL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600">
-                <Lock className="w-3 h-3" /> Approval
-              </span>
-            )}
-          </div>
+      {isOfficial && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-[#a93017]" />
+      )}
 
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-              statusStyles[activity.status] ?? 'bg-slate-100 text-slate-600'
+      {/* Top Pills */}
+      <div className={`flex items-center justify-between gap-2 mb-2.5 ${isOfficial ? 'pt-1' : ''}`}>
+        {isOfficial ? (
+          <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            OFFICIAL · {activity.meetingPoint}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 bg-[#6fd8c8]/30 text-[#00685d] px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+            Traveller Hosted
+          </span>
+        )}
+
+        <span className="text-[11px] font-extrabold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/70 shrink-0">
+          {timeLabel}
+        </span>
+      </div>
+
+      {/* Title & Host Subtitle */}
+      <div className="space-y-1 mb-3">
+        <h3 className="text-[20px] font-extrabold text-[#111c2d] leading-snug">{activity.title}</h3>
+        <p className="text-xs text-[#59413c] flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-[#111c2d]">
+            {isOfficial ? 'Hostel Team Event' : activity.creatorNickname}
+          </span>
+          <span>•</span>
+          <span className="inline-flex items-center gap-0.5 text-[#a93017] font-semibold">
+            <MapPin className="w-3.5 h-3.5" /> {activity.meetingPoint}
+          </span>
+        </p>
+      </div>
+
+      {/* Soft Info Callout Box */}
+      <div className="bg-[#f0f3ff] rounded-xl p-3 flex items-center justify-between gap-2.5 mb-3 border border-[#e0bfb8]/20">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+              isOfficial ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
             }`}
           >
-            {activity.status}
+            <CatIcon className="w-4 h-4" />
+          </div>
+          <p className="text-xs text-[#59413c] line-clamp-2 leading-relaxed">{activity.description}</p>
+        </div>
+        {activity.status === 'OPEN' && spotsLeft <= 3 && (
+          <span className="bg-[#d8e3fb] text-[#111c2d] text-[10px] font-bold px-2 py-1 rounded-full shrink-0">
+            {spotsLeft} {spotsLeft === 1 ? 'seat' : 'seats'} left
+          </span>
+        )}
+      </div>
+
+      {/* Capacity Progress Bar */}
+      <div className="space-y-2 mb-3.5">
+        <div className="flex items-center justify-between text-[11px] text-[#59413c]">
+          <span className="font-semibold uppercase tracking-wide text-[10px] text-slate-500">
+            {activity.category} · {activity.joinMode === 'PUBLIC' ? 'Instant Join' : 'Approval'}
+          </span>
+          <span>
+            <strong className="text-[#111c2d] font-extrabold">
+              {activity.confirmedCount}/{activity.maxParticipants} joined
+            </strong>{' '}
+            {activity.status === 'OPEN' ? `(${spotsLeft} left)` : `· ${activity.status}`}
           </span>
         </div>
-
-        <h3 className="text-base font-extrabold text-slate-900 mb-1">{activity.title}</h3>
-        <p className="text-xs text-slate-600 line-clamp-1 mb-3">{activity.description}</p>
-
-        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-[#FAF7F2] text-xs text-slate-700 font-mono">
-          <div className="flex items-center gap-1.5 truncate">
-            <Calendar className="w-3.5 h-3.5 text-[#E85D3F] shrink-0" />
-            <span className="truncate">{timeLabel}</span>
-          </div>
-          <div className="flex items-center gap-1.5 truncate">
-            <MapPin className="w-3.5 h-3.5 text-[#E85D3F] shrink-0" />
-            <span className="truncate">{activity.meetingPoint}</span>
-          </div>
+        <div className="w-full h-2 rounded-full bg-[#e7eeff] overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              isOfficial
+                ? 'bg-gradient-to-r from-amber-500 to-[#a93017]'
+                : 'bg-[#00685d]'
+            }`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </div>
 
-      {/* Perforated Boarding-Pass Divider */}
-      <div className="relative flex items-center">
-        <span className="w-3.5 h-3.5 rounded-full bg-[#FAF7F2] border-r border-amber-200/80 -ml-2 shrink-0" />
-        <div className="flex-1 border-t border-dashed border-amber-200" />
-        <span className="w-3.5 h-3.5 rounded-full bg-[#FAF7F2] border-l border-amber-200/80 -mr-2 shrink-0" />
-      </div>
-
-      {/* Boarding Pass Stub */}
-      <div className="px-4 sm:px-5 py-3 flex items-center justify-between gap-2 text-xs bg-amber-50/30">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-1" title={`${activity.confirmedCount}/${activity.maxParticipants} seats`}>
-            {Array.from({ length: maxDots }).map((_, idx) => (
-              <span
-                key={idx}
-                className={`w-2 h-2 rounded-full ${
-                  idx < filledDots ? 'bg-[#E85D3F]' : 'bg-amber-200/80'
-                }`}
-              />
-            ))}
-          </div>
-          <span className="font-mono font-bold text-slate-700 text-[11px]">
-            {activity.confirmedCount}/{activity.maxParticipants}
+      {/* Full-Width Pill CTA */}
+      {isJoinedNow ? (
+        <div className="w-full h-11 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-bold flex items-center justify-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>You're in the Circle</span>
+        </div>
+      ) : isPendingNow ? (
+        <div className="w-full h-11 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-sm font-bold flex items-center justify-center">
+          Pending Host Approval
+        </div>
+      ) : activity.status === 'OPEN' && onJoined ? (
+        <button
+          type="button"
+          onClick={handleQuickAction}
+          disabled={joining}
+          className={`w-full h-11 rounded-full text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-60 ${
+            activity.joinMode === 'PUBLIC'
+              ? 'bg-[#a93017] hover:bg-[#cb482c] text-white shadow-sm'
+              : 'bg-[#f0f3ff] hover:bg-[#ffdad3]/40 text-[#a93017] border border-[#e0bfb8]/40'
+          }`}
+        >
+          {joining ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : activity.joinMode === 'PUBLIC' ? null : (
+            <Hand className="w-4 h-4" />
+          )}
+          <span>
+            {joining
+              ? activity.joinMode === 'PUBLIC'
+                ? 'Joining...'
+                : 'Sending Request...'
+              : activity.joinMode === 'PUBLIC'
+                ? 'Quick RSVP · Join Circle'
+                : 'Request to Join'}
           </span>
-          {activity.status === 'OPEN' && spotsLeft === 1 && (
-            <span className="text-[10px] font-bold text-[#E85D3F]">1 left</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {activity.isJoined || quickJoined ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
-              <Stamp className="w-3 h-3" /> Stamped In
-            </span>
-          ) : activity.hasPendingRequest ? (
-            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-[11px]">
-              Pending
-            </span>
-          ) : activity.status === 'OPEN' && activity.joinMode === 'PUBLIC' && onJoined ? (
-            <button
-              type="button"
-              onClick={handleQuickJoin}
-              disabled={joining}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#E85D3F] hover:bg-[#D94E32] active:scale-95 text-white font-bold text-[11px] uppercase tracking-wide transition disabled:opacity-60"
-            >
-              {joining ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stamp className="w-3 h-3" />}
-              {joining ? 'Stamping...' : 'Stamp Me In'}
-            </button>
-          ) : (
-            <span className="text-[11px] text-slate-500 font-medium">
-              By {activity.creatorNickname}
-            </span>
-          )}
-        </div>
-      </div>
+          {!joining && activity.joinMode === 'PUBLIC' && <ArrowRight className="w-4 h-4" />}
+        </button>
+      ) : null}
     </Link>
   );
 }

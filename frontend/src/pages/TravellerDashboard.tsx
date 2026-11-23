@@ -1,26 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, MapPin } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
-import { SocialStatusWidget, type SocialStatusValue } from '../components/SocialStatusWidget';
+import { type SocialStatusValue } from '../components/SocialStatusWidget';
 import { ActivityCard, type ActivitySummary } from '../components/ActivityCard';
 import { CommonRoomRadar, type RadarTraveller } from '../components/CommonRoomRadar';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
 
-const FEED_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'starting_soon', label: 'Starting soon' },
-  { key: 'upcoming', label: 'Upcoming' },
-];
-
-const CATEGORY_FILTERS = [
-  { key: 'ALL', label: 'All vibes' },
-  { key: 'GAMES', label: 'Games' },
-  { key: 'SOCIAL', label: 'Social' },
-  { key: 'EXPLORATION', label: 'Exploration' },
-  { key: 'FOOD', label: 'Food' },
+const FILTER_CHIPS = [
+  { key: 'all', category: 'ALL', label: 'All Active' },
+  { key: 'starting_soon', category: 'ALL', label: '🔥 Happening Soon' },
+  { key: 'all', category: 'GAMES', label: '🃏 Games' },
+  { key: 'all', category: 'SOCIAL', label: '☕ Social' },
+  { key: 'all', category: 'EXPLORATION', label: '🌅 Exploration' },
+  { key: 'all', category: 'FOOD', label: '🍛 Food' },
 ];
 
 export function TravellerDashboard() {
@@ -28,12 +23,12 @@ export function TravellerDashboard() {
   const [statusDoc, setStatusDoc] = useState<{ status: SocialStatusValue; expiresAt: string } | null>(
     null
   );
-  const [openCount, setOpenCount] = useState(0);
   const [radarTravellers, setRadarTravellers] = useState<RadarTraveller[]>([]);
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
-  const [filter, setFilter] = useState('all');
-  const [category, setCategory] = useState('ALL');
+  const [activeChipIdx, setActiveChipIdx] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const activeChip = FILTER_CHIPS[activeChipIdx];
 
   const loadData = useCallback(async () => {
     try {
@@ -43,17 +38,16 @@ export function TravellerDashboard() {
         ),
         apiRequest<{ openCount: number; travellers: RadarTraveller[] }>('/traveller/discover'),
         apiRequest<{ activities: ActivitySummary[] }>(
-          `/activities?filter=${filter}&category=${category}`
+          `/activities?filter=${activeChip.key}&category=${activeChip.category}`
         ),
       ]);
       setStatusDoc(statusRes.status);
-      setOpenCount(discoverRes.openCount);
       setRadarTravellers(discoverRes.travellers);
       setActivities(actRes.activities);
     } finally {
       setLoading(false);
     }
-  }, [filter, category]);
+  }, [activeChip.key, activeChip.category]);
 
   useEffect(() => {
     void loadData();
@@ -83,93 +77,95 @@ export function TravellerDashboard() {
 
   return (
     <TravellerLayout>
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-900">
-              Hey {user?.nickname}!
-            </h1>
-            <p className="text-xs text-slate-500">See who's around or join an activity</p>
+      <div className="space-y-4">
+        {/* Top Location & Host Micro-Bar */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-xs border border-[#e0bfb8]/35">
+            <MapPin className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-[#111c2d]">
+              {user?.hostelName ?? 'Your Hostel'}
+            </span>
           </div>
           <Link
             to="/app/activities/new"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#E85D3F] hover:bg-[#D94E32] text-white text-xs font-semibold shadow-xs transition"
+            className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200/70 px-3 py-1.5 rounded-full text-xs font-bold text-amber-900 transition active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Create Activity
+            <Plus className="w-3.5 h-3.5 text-[#a93017]" /> Host Plan
           </Link>
         </div>
 
+        {/* Hero: Live Hostel Radar + Inline Vibe Switcher */}
         <CommonRoomRadar
           hostelName={user?.hostelName ?? 'Your Hostel'}
+          hostelCity={user?.hostelCity ?? ''}
           travellers={radarTravellers}
-        />
-
-        <SocialStatusWidget
           currentStatus={statusDoc?.status ?? null}
-          expiresAt={statusDoc?.expiresAt ?? null}
-          openCount={openCount}
-          onUpdated={loadData}
+          onStatusUpdated={loadData}
         />
 
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">Activities at your hostel</h2>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {FEED_FILTERS.map((f) => (
+        {/* Tactile Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
+          {FILTER_CHIPS.map((chip, idx) => {
+            const active = activeChipIdx === idx;
+            return (
               <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                  filter === f.key
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                key={chip.label}
+                type="button"
+                onClick={() => setActiveChipIdx(idx)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-bold transition ${
+                  active
+                    ? 'bg-[#14241E] text-white shadow-sm'
+                    : 'bg-white text-[#59413c] border border-[#e0bfb8]/35 hover:bg-[#f0f3ff] shadow-2xs'
                 }`}
               >
-                {f.label}
+                {idx === 0 ? `${chip.label} (${activities.length})` : chip.label}
               </button>
-            ))}
-            {CATEGORY_FILTERS.filter((c) => c.key !== 'ALL').map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setCategory(category === c.key ? 'ALL' : c.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                  category === c.key
-                    ? 'bg-[#E85D3F] text-white'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          {loading ? (
-            <div className="py-10 flex justify-center text-slate-400">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          ) : activities.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-amber-200/80 p-8 text-center">
-              <p className="text-sm font-semibold text-slate-800 mb-1">No matching activities yet</p>
-              <p className="text-xs text-slate-500 mb-4">
-                Start something simple—like chai on the rooftop or a quick card game.
-              </p>
-              <Link
-                to="/app/activities/new"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold"
-              >
-                <Plus className="w-4 h-4" /> Host an activity
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {activities.map((a) => (
-                <ActivityCard key={a._id} activity={a} onJoined={loadData} />
-              ))}
-            </div>
+        {/* Section Header */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-[18px] font-extrabold text-[#111c2d] leading-tight">
+              Happening Around goSTOPS
+            </h2>
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+              {activities.length} Live
+            </span>
+          </div>
+          {user?.hostelCity && (
+            <span className="text-[11px] font-bold text-[#a93017] shrink-0">
+              {user.hostelCity} Social
+            </span>
           )}
-        </section>
+        </div>
+
+        {/* Activity Cards */}
+        {loading ? (
+          <div className="py-10 flex justify-center text-slate-400">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-8 text-center shadow-xs">
+            <p className="text-sm font-bold text-[#111c2d] mb-1">No matching activities yet</p>
+            <p className="text-xs text-[#59413c] mb-4">
+              Start something simple—like chai on the rooftop or a quick card game.
+            </p>
+            <Link
+              to="/app/activities/new"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-[#a93017] text-white text-xs font-bold shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Host an activity
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3.5">
+            {activities.map((a) => (
+              <ActivityCard key={a._id} activity={a} onJoined={loadData} />
+            ))}
+          </div>
+        )}
       </div>
     </TravellerLayout>
   );
