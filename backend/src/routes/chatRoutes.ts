@@ -125,7 +125,7 @@ router.post('/rooms/direct', async (req, res, next) => {
 const createGroupSchema = z.object({
   name: z.string().trim().min(2, 'Group name is required').max(60),
   description: z.string().trim().max(200).optional(),
-  avatar: z.string().url().max(300).nullable().optional(),
+  avatar: z.string().trim().max(300).nullable().optional(),
   memberIds: z.array(z.string().min(1)).min(1, 'Pick at least 1 traveller').max(30),
 });
 
@@ -191,7 +191,7 @@ router.post('/rooms/group', async (req, res, next) => {
 const updateGroupSchema = z.object({
   name: z.string().trim().min(2, 'Group name must be at least 2 characters').max(60).optional(),
   description: z.string().trim().max(200).optional(),
-  avatar: z.string().url().max(300).nullable().optional(),
+  avatar: z.string().trim().max(300).nullable().optional(),
 });
 
 router.patch('/rooms/:roomId', async (req, res, next) => {

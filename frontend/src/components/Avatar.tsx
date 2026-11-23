@@ -13,16 +13,26 @@ export const PRESET_AVATARS = [
   'https://api.dicebear.com/9.x/adventurer/svg?seed=Nisha&backgroundColor=ffdfbf',
 ];
 
-export const GROUP_PRESET_AVATARS = [
-  'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=TrekCrew&backgroundColor=b6e3f4',
-  'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=ChaiGang&backgroundColor=ffdfbf',
-  'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=JamNight&backgroundColor=c0aede',
-  'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=SunsetSquad&backgroundColor=ffd5dc',
-  'https://api.dicebear.com/9.x/fun-emoji/svg?seed=HostelVibe&backgroundColor=fde68a',
-  'https://api.dicebear.com/9.x/fun-emoji/svg?seed=RoadTrip&backgroundColor=bbf7d0',
-  'https://api.dicebear.com/9.x/fun-emoji/svg?seed=GameNight&backgroundColor=d1d4f9',
-  'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Bonfire&backgroundColor=fecaca',
+interface GroupSquadPreset {
+  id: string;
+  bg: string;
+  seeds: [string, string, string];
+}
+
+const GROUP_SQUAD_PRESETS: GroupSquadPreset[] = [
+  { id: 'squad:1', bg: '#b6e3f4', seeds: ['Aarav', 'Ananya', 'Kabir'] },
+  { id: 'squad:2', bg: '#ffdfbf', seeds: ['Maya', 'Rohan', 'Zoya'] },
+  { id: 'squad:3', bg: '#c0aede', seeds: ['Liam', 'Elena', 'Marco'] },
+  { id: 'squad:4', bg: '#ffd5dc', seeds: ['Priya', 'Sam', 'Nisha'] },
+  { id: 'squad:5', bg: '#fde68a', seeds: ['Kabir', 'Maya', 'Sam'] },
+  { id: 'squad:6', bg: '#bbf7d0', seeds: ['Zoya', 'Aarav', 'Elena'] },
+  { id: 'squad:7', bg: '#d1d4f9', seeds: ['Rohan', 'Priya', 'Liam'] },
+  { id: 'squad:8', bg: '#fecaca', seeds: ['Nisha', 'Marco', 'Ananya'] },
 ];
+
+const GROUP_SQUAD_MAP = new Map(GROUP_SQUAD_PRESETS.map((p) => [p.id, p]));
+
+export const GROUP_PRESET_AVATARS = GROUP_SQUAD_PRESETS.map((p) => p.id);
 
 export function Avatar({
   src,
@@ -41,6 +51,33 @@ export function Avatar({
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  if (src && GROUP_SQUAD_MAP.has(src)) {
+    const squad = GROUP_SQUAD_MAP.get(src)!;
+    return (
+      <div
+        style={{ backgroundColor: squad.bg }}
+        className={`${className} relative overflow-hidden shrink-0 select-none`}
+        aria-label={name}
+      >
+        <img
+          src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${squad.seeds[0]}`}
+          alt=""
+          className="absolute bottom-0 -left-[12%] w-[68%] h-[68%] object-contain"
+        />
+        <img
+          src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${squad.seeds[2]}`}
+          alt=""
+          className="absolute bottom-0 -right-[12%] w-[68%] h-[68%] object-contain"
+        />
+        <img
+          src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${squad.seeds[1]}`}
+          alt={name}
+          className="absolute -bottom-[2%] left-1/2 -translate-x-1/2 w-[78%] h-[78%] object-contain z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.12)]"
+        />
+      </div>
+    );
+  }
 
   if (src) {
     return (

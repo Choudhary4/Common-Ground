@@ -759,7 +759,7 @@ export function ChatPage() {
                               : 'border-transparent hover:border-[#e0bfb8]/60 bg-[#f9f9ff]'
                           }`}
                         >
-                          <img src={url} alt="Group avatar" className="w-10 h-10 rounded-lg" />
+                          <Avatar src={url} name="Group avatar" className="w-12 h-12 rounded-xl" />
                         </button>
                       ))}
                     </div>
@@ -1251,7 +1251,7 @@ export function ChatPage() {
                           : 'border-transparent hover:border-[#e0bfb8]/60 bg-[#f9f9ff]'
                       }`}
                     >
-                      <img src={url} alt="Group avatar" className="w-10 h-10 rounded-lg" />
+                      <Avatar src={url} name="Group avatar" className="w-12 h-12 rounded-xl" />
                     </button>
                   ))}
                 </div>
