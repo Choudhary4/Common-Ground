@@ -1,6 +1,11 @@
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  let data = { title: 'Common Ground', body: 'New update at your hostel', url: '/app/notifications' };
+  let data = {
+    title: 'Common Ground',
+    body: 'New update at your hostel',
+    url: '/app/notifications',
+    tag: 'common-ground',
+  };
   try {
     data = { ...data, ...event.data.json() };
   } catch {
@@ -12,6 +17,9 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/icon.svg',
       badge: '/icon.svg',
+      tag: data.tag,
+      renotify: true,
+      vibrate: [150, 50, 150],
       data: { url: data.url || '/app/notifications' },
     })
   );

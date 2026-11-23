@@ -26,7 +26,13 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
     async function checkPush() {
-      if (!isPushSupported() || Notification.permission !== 'default') return;
+      if (!isPushSupported()) return;
+      if (Notification.permission === 'granted') {
+        // Ensure the current logged-in traveller session is synced to backend push subscriptions
+        void enablePushNotifications().catch(() => {});
+        return;
+      }
+      if (Notification.permission !== 'default') return;
       if (localStorage.getItem('cg_push_dismissed') === '1') return;
       const key = await getVapidPublicKey();
       if (active && key) setShowPushPrompt(true);
@@ -35,7 +41,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const handleEnablePush = async () => {
     setEnablingPush(true);
@@ -69,7 +75,24 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
     void loadNotifs();
 
     const socket = getSocket();
-    const onNew = () => setUnreadCount((c) => c + 1);
+    const showLocalAlert = (payload?: { title?: string; message?: string; _id?: string; notification?: { title?: string; message?: string; _id?: string } }) => {
+      const n = payload?.notification ?? payload;
+      if (!isPushSupported() || Notification.permission !== 'granted' || !n?.title) return;
+      void navigator.serviceWorker.ready
+        .then((reg) =>
+          reg.showNotification(n.title!, {
+            body: n.message ?? '',
+            icon: '/icon.svg',
+            badge: '/icon.svg',
+            tag: n._id ?? 'common-ground',
+          })
+        )
+        .catch(() => {});
+    };
+    const onNew = (payload?: unknown) => {
+      setUnreadCount((c) => c + 1);
+      showLocalAlert(payload as Parameters<typeof showLocalAlert>[0]);
+    };
     const onReadAll = () => setUnreadCount(0);
     socket.on('notification:new', onNew);
     socket.on('join_request:received', onNew);

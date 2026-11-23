@@ -134,6 +134,19 @@ router.get('/discover', async (req, res, next) => {
 
     const statusMap = new Map(activeStatuses.map((s) => [s.userId.toString(), s]));
 
+    // Check which travellers were recently invited by the current user
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const escapedNick = req.auth!.nickname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const recentInvites = await Notification.find({
+      hostelId,
+      type: 'ACTIVITY_INVITE',
+      createdAt: { $gt: twoHoursAgo },
+      message: { $regex: `^${escapedNick} invited` },
+    })
+      .select('userId')
+      .lean();
+    const invitedSet = new Set(recentInvites.map((n) => n.userId.toString()));
+
     const travellers = users
       .map((u) => {
         const s = statusMap.get(u._id.toString());
@@ -143,6 +156,7 @@ router.get('/discover', async (req, res, next) => {
           interests: u.interests ?? [],
           status: s?.status ?? null,
           expiresAt: s?.expiresAt ?? null,
+          invited: invitedSet.has(u._id.toString()),
         };
       })
       .sort((a, b) => {
@@ -449,6 +463,19 @@ router.post('/push/unsubscribe', async (req, res, next) => {
     const { endpoint } = z.object({ endpoint: z.string().min(1) }).parse(req.body);
     await PushSubscription.deleteOne({ endpoint, userId: req.auth!.userId });
     res.json({ subscribed: false });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/push/test', async (req, res, next) => {
+  try {
+    const result = await sendPushToUser(req.auth!.userId, {
+      title: 'Common Ground Test Alert',
+      body: 'Mobile push notifications are working on this device!',
+      url: '/app/notifications',
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }

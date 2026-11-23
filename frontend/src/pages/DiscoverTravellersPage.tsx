@@ -24,6 +24,7 @@ interface OptedInTraveller {
   interests: string[];
   status: SocialStatusValue | null;
   expiresAt: string | null;
+  invited?: boolean;
 }
 
 const VIBE_FILTERS = [
@@ -32,6 +33,13 @@ const VIBE_FILTERS = [
   { key: 'UP_FOR_ACTIVITIES', label: 'Up for activities', icon: GameController },
   { key: 'LOOKING_FOR_COMPANY', label: 'Company', icon: Coffee },
   { key: 'JUST_CHILLING', label: 'Chilling', icon: Headphones },
+];
+
+const REPORT_REASONS = [
+  'Inappropriate behaviour',
+  'Spam / Repeated invites',
+  'Fake or misleading profile',
+  'Harassment or disrespect',
 ];
 
 function getVibeBadgeStyle(status: SocialStatusValue | null) {
@@ -53,10 +61,22 @@ export function DiscoverTravellersPage() {
   const [travellers, setTravellers] = useState<OptedInTraveller[]>([]);
   const [myOpenActivities, setMyOpenActivities] = useState<ActivitySummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+
+  // Modals
   const [inviteTarget, setInviteTarget] = useState<OptedInTraveller | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState('');
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
+
+  const [blockTarget, setBlockTarget] = useState<OptedInTraveller | null>(null);
+  const [blocking, setBlocking] = useState(false);
+
+  const [reportTarget, setReportTarget] = useState<OptedInTraveller | null>(null);
+  const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
+  const [reportDesc, setReportDesc] = useState('');
+  const [reporting, setReporting] = useState(false);
+
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [vibeFilter, setVibeFilter] = useState<string>('ALL');
 
   const load = useCallback(async () => {
@@ -66,6 +86,13 @@ export function DiscoverTravellersPage() {
         apiRequest<{ activities: ActivitySummary[] }>('/activities?filter=my'),
       ]);
       setTravellers(disc.travellers);
+      setInvitedIds((prev) => {
+        const next = new Set(prev);
+        for (const t of disc.travellers) {
+          if (t.invited) next.add(t.userId);
+        }
+        return next;
+      });
       const openOwned = acts.activities.filter((a) => a.isCreator && a.status === 'OPEN');
       setMyOpenActivities(openOwned);
       if (openOwned.length > 0 && !selectedActivityId) {
@@ -98,6 +125,7 @@ export function DiscoverTravellersPage() {
           activityId: selectedActivityId,
         }),
       });
+      setInvitedIds((prev) => new Set(prev).add(inviteTarget.userId));
       setFeedback(`Invited ${inviteTarget.nickname}!`);
       setInviteTarget(null);
     } catch (err) {
@@ -107,23 +135,41 @@ export function DiscoverTravellersPage() {
     }
   };
 
-  const blockUser = async (targetUserId: string, nickname: string) => {
-    if (!window.confirm(`Block ${nickname}? You won't see each other in discovery.`)) return;
-    await apiRequest('/traveller/block', {
-      method: 'POST',
-      body: JSON.stringify({ targetUserId }),
-    });
-    void load();
+  const confirmBlock = async () => {
+    if (!blockTarget) return;
+    setBlocking(true);
+    try {
+      await apiRequest('/traveller/block', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId: blockTarget.userId }),
+      });
+      setFeedback(`Blocked ${blockTarget.nickname}.`);
+      setBlockTarget(null);
+      await load();
+    } finally {
+      setBlocking(false);
+    }
   };
 
-  const reportUser = async (targetUserId: string, nickname: string) => {
-    const reason = window.prompt(`Why are you reporting ${nickname}?`);
-    if (!reason || reason.trim().length < 3) return;
-    await apiRequest('/traveller/reports', {
-      method: 'POST',
-      body: JSON.stringify({ reportedUserId: targetUserId, reason: reason.trim() }),
-    });
-    setFeedback('Report submitted to hostel manager.');
+  const submitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportTarget) return;
+    setReporting(true);
+    try {
+      await apiRequest('/traveller/reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          reportedUserId: reportTarget.userId,
+          reason: reportReason,
+          description: reportDesc.trim(),
+        }),
+      });
+      setFeedback(`Report submitted for ${reportTarget.nickname}.`);
+      setReportTarget(null);
+      setReportDesc('');
+    } finally {
+      setReporting(false);
+    }
   };
 
   const filteredTravellers = travellers.filter(
@@ -211,6 +257,7 @@ export function DiscoverTravellersPage() {
               const badge = getVibeBadgeStyle(t.status);
               const BadgeIcon = badge.icon;
               const isWarm = idx % 2 === 1;
+              const isInvited = Boolean(t.invited) || invitedIds.has(t.userId);
 
               return (
                 <div
@@ -259,23 +306,33 @@ export function DiscoverTravellersPage() {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {myOpenActivities.length > 0 && (
-                        <button
-                          onClick={() => setInviteTarget(t)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-95 text-white text-xs font-bold shadow-xs transition"
-                        >
-                          <PaperPlaneTilt weight="duotone" className="w-3.5 h-3.5" /> Invite
-                        </button>
-                      )}
+                      {myOpenActivities.length > 0 &&
+                        (isInvited ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                            <CheckCircle weight="fill" className="w-3.5 h-3.5 text-emerald-600" />
+                            Invited
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setInviteTarget(t)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-95 text-white text-xs font-bold shadow-xs transition"
+                          >
+                            <PaperPlaneTilt weight="duotone" className="w-3.5 h-3.5" /> Invite
+                          </button>
+                        ))}
                       <button
-                        onClick={() => reportUser(t.userId, t.nickname)}
+                        onClick={() => {
+                          setReportTarget(t);
+                          setReportReason(REPORT_REASONS[0]);
+                          setReportDesc('');
+                        }}
                         className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                         title="Report"
                       >
                         <Flag weight="duotone" className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => blockUser(t.userId, t.nickname)}
+                        onClick={() => setBlockTarget(t)}
                         className="p-2 rounded-full text-slate-400 hover:text-[#111c2d] hover:bg-slate-100 transition"
                         title="Block"
                       >
@@ -341,6 +398,140 @@ export function DiscoverTravellersPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Custom Block Modal */}
+        {blockTarget && (
+          <div className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <Prohibit weight="duotone" className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-extrabold text-[#111c2d] text-base">
+                    Block {blockTarget.nickname}?
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setBlockTarget(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+                >
+                  <X weight="bold" className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-[#59413c] leading-relaxed">
+                You and <strong>{blockTarget.nickname}</strong> won't see each other in Discover or
+                send activity invitations. You can unblock anytime in Settings.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setBlockTarget(null)}
+                  disabled={blocking}
+                  className="px-4 py-2 rounded-full text-xs font-bold text-[#59413c] hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmBlock}
+                  disabled={blocking}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs disabled:opacity-60"
+                >
+                  {blocking ? (
+                    <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Prohibit weight="bold" className="w-3.5 h-3.5" />
+                  )}
+                  {blocking ? 'Blocking...' : 'Block Traveller'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Report Modal */}
+        {reportTarget && (
+          <div className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <form
+              onSubmit={submitReport}
+              className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                    <Flag weight="duotone" className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-extrabold text-[#111c2d] text-base">
+                    Report {reportTarget.nickname}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportTarget(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+                >
+                  <X weight="bold" className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#111c2d]">Reason</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {REPORT_REASONS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setReportReason(r)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition ${
+                        reportReason === r
+                          ? 'bg-[#14241E] text-white'
+                          : 'bg-[#f0f3ff] text-[#59413c] hover:bg-[#e7eeff]'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#111c2d] mb-1">
+                  Details (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  value={reportDesc}
+                  onChange={(e) => setReportDesc(e.target.value)}
+                  placeholder="Share any helpful context for the hostel manager..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-xs text-[#111c2d]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setReportTarget(null)}
+                  disabled={reporting}
+                  className="px-4 py-2 rounded-full text-xs font-bold text-[#59413c] hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reporting}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-bold bg-[#a93017] hover:bg-[#cb482c] text-white shadow-xs disabled:opacity-60"
+                >
+                  {reporting ? (
+                    <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Flag weight="duotone" className="w-3.5 h-3.5" />
+                  )}
+                  {reporting ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

@@ -39,7 +39,9 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
   const [pushMsg, setPushMsg] = useState<string | null>(null);
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const load = async () => {
@@ -113,9 +115,35 @@ export function SettingsPage() {
     }
   };
 
+  const sendTestPush = async () => {
+    setTestingPush(true);
+    setPushMsg(null);
+    try {
+      await enablePushNotifications().catch(() => {});
+      const res = await apiRequest<{ configured: boolean; subscriptions: number; sent: number }>(
+        '/traveller/push/test',
+        { method: 'POST' }
+      );
+      if (!res.configured) {
+        setPushMsg('Push keys not configured on server yet.');
+      } else if (res.sent > 0) {
+        setPushMsg('Test alert sent! Check your device notification bar.');
+      } else {
+        setPushMsg('No active push subscription found on this device. Try Disable → Enable.');
+      }
+    } finally {
+      setTestingPush(false);
+    }
+  };
+
   const unblock = async (id: string) => {
-    await apiRequest(`/traveller/block/${id}`, { method: 'DELETE' });
-    void load();
+    setUnblockingId(id);
+    try {
+      await apiRequest(`/traveller/block/${id}`, { method: 'DELETE' });
+      await load();
+    } finally {
+      setUnblockingId(null);
+    }
   };
 
   const handleLogout = async () => {
@@ -269,7 +297,20 @@ export function SettingsPage() {
               <span className="text-[11px] font-semibold text-slate-400">Unsupported</span>
             )}
           </div>
-          {pushMsg && <p className="text-xs font-semibold text-emerald-700 pl-13">{pushMsg}</p>}
+          {pushEnabled && (
+            <div className="pt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={sendTestPush}
+                disabled={testingPush}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] text-[11px] font-bold disabled:opacity-60"
+              >
+                {testingPush && <CircleNotch className="w-3 h-3 animate-spin" />}
+                {testingPush ? 'Sending...' : 'Send Test Notification'}
+              </button>
+            </div>
+          )}
+          {pushMsg && <p className="text-xs font-semibold text-emerald-700">{pushMsg}</p>}
         </div>
 
         {/* Blocked Travellers */}
@@ -290,9 +331,15 @@ export function SettingsPage() {
                   <span className="font-bold text-[#111c2d]">{u.nickname}</span>
                   <button
                     onClick={() => unblock(u._id)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-[#59413c] font-bold hover:text-[#111c2d]"
+                    disabled={unblockingId === u._id}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-[#59413c] font-bold hover:text-[#111c2d] disabled:opacity-60"
                   >
-                    <UserMinus weight="duotone" className="w-3.5 h-3.5" /> Unblock
+                    {unblockingId === u._id ? (
+                      <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <UserMinus weight="duotone" className="w-3.5 h-3.5" />
+                    )}
+                    {unblockingId === u._id ? 'Unblocking...' : 'Unblock'}
                   </button>
                 </div>
               ))}
