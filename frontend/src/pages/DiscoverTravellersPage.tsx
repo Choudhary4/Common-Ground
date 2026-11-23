@@ -4,6 +4,7 @@ import { TravellerLayout } from '../components/TravellerLayout';
 import { formatSocialStatus, type SocialStatusValue } from '../components/SocialStatusWidget';
 import { type ActivitySummary } from '../components/ActivityCard';
 import { apiRequest, ApiError } from '../lib/api';
+import { getSocket } from '../lib/socket';
 
 interface OptedInTraveller {
   userId: string;
@@ -40,6 +41,12 @@ export function DiscoverTravellersPage() {
 
   useEffect(() => {
     void load();
+    const socket = getSocket();
+    const refresh = () => void load();
+    socket.on('social:updated', refresh);
+    return () => {
+      socket.off('social:updated', refresh);
+    };
   }, [load]);
 
   const sendInvite = async () => {
