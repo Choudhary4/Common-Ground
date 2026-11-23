@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles, Coffee, Users, Compass, X } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 
@@ -55,10 +55,17 @@ export function SocialStatusWidget({
   openCount: number;
   onUpdated: () => void;
 }) {
+  const [optimisticStatus, setOptimisticStatus] = useState<SocialStatusValue | null>(currentStatus);
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
+  useEffect(() => {
+    setOptimisticStatus(currentStatus);
+  }, [currentStatus]);
+
   const selectStatus = async (status: SocialStatusValue) => {
+    const prev = optimisticStatus;
+    setOptimisticStatus(status);
     setBusy(true);
     try {
       await apiRequest('/traveller/status', {
@@ -66,22 +73,28 @@ export function SocialStatusWidget({
         body: JSON.stringify({ status }),
       });
       onUpdated();
+    } catch {
+      setOptimisticStatus(prev);
     } finally {
       setBusy(false);
     }
   };
 
   const turnOff = async () => {
+    const prev = optimisticStatus;
+    setOptimisticStatus(null);
     setBusy(true);
     try {
       await apiRequest('/traveller/status', { method: 'DELETE' });
       onUpdated();
+    } catch {
+      setOptimisticStatus(prev);
     } finally {
       setBusy(false);
     }
   };
 
-  if (dismissed && !currentStatus) {
+  if (dismissed && !optimisticStatus) {
     return (
       <div className="bg-white rounded-2xl border border-amber-200/80 p-4 flex items-center justify-between">
         <p className="text-sm text-slate-600">
@@ -110,7 +123,7 @@ export function SocialStatusWidget({
             </span>
           </p>
         </div>
-        {currentStatus ? (
+        {optimisticStatus ? (
           <button
             onClick={turnOff}
             disabled={busy}
@@ -131,7 +144,7 @@ export function SocialStatusWidget({
       <div className="grid grid-cols-2 gap-2.5">
         {SOCIAL_STATUS_OPTIONS.map((opt) => {
           const Icon = opt.icon;
-          const selected = currentStatus === opt.value;
+          const selected = optimisticStatus === opt.value;
           return (
             <button
               key={opt.value}
@@ -158,7 +171,7 @@ export function SocialStatusWidget({
         })}
       </div>
 
-      {currentStatus && expiresAt && (
+      {optimisticStatus && expiresAt && (
         <p className="text-[11px] text-slate-400 mt-2.5">
           Visible until {new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
