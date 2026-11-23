@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { QrCode, Download, Printer, RefreshCw, Ban, KeyRound, Copy, Check } from 'lucide-react';
+import { QrCode, Download, Printer, RefreshCw, Ban, KeyRound, Copy, Check, Loader2 } from 'lucide-react';
 import { StaffLayout } from '../components/StaffLayout';
-import { apiRequest } from '../lib/api';
+import { apiRequest, ApiError } from '../lib/api';
 
 interface Overview {
   hostelName: string;
@@ -32,7 +32,8 @@ export function StaffDashboardPage() {
   const [qr, setQr] = useState<QrData | null>(null);
   const [accessCode, setAccessCode] = useState<AccessCodeData | null>(null);
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     const [ov, qrRes, codeRes] = await Promise.all([
@@ -50,44 +51,56 @@ export function StaffDashboardPage() {
   }, [loadAll]);
 
   const generateQr = async () => {
-    setBusy(true);
+    setBusyAction('qr-generate');
+    setError(null);
     try {
       await apiRequest('/staff/qr/generate', { method: 'POST' });
       await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to generate QR code');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const revokeQr = async () => {
     if (!window.confirm('Revoke current QR code? Travellers will no longer be able to scan it.')) return;
-    setBusy(true);
+    setBusyAction('qr-revoke');
+    setError(null);
     try {
       await apiRequest('/staff/qr/revoke', { method: 'POST' });
       await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to revoke QR code');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const regenerateCode = async () => {
-    setBusy(true);
+    setBusyAction('code-generate');
+    setError(null);
     try {
       await apiRequest('/staff/access-code/regenerate', { method: 'POST' });
       await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to generate access code');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const revokeCode = async () => {
     if (!window.confirm('Revoke current hostel access code?')) return;
-    setBusy(true);
+    setBusyAction('code-revoke');
+    setError(null);
     try {
       await apiRequest('/staff/access-code/revoke', { method: 'POST' });
       await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to revoke access code');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -104,6 +117,11 @@ export function StaffDashboardPage() {
       subtitle={overview ? `${overview.hostelCity} · QR & Access Code Management` : undefined}
     >
       <div className="space-y-6">
+        {error && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+            {error}
+          </div>
+        )}
         <div className="no-print grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
             <p className="text-xs text-slate-500">Active Sessions</p>
@@ -196,17 +214,27 @@ export function StaffDashboardPage() {
                   </button>
                   <button
                     onClick={generateQr}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold"
+                    disabled={busyAction !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold disabled:opacity-60"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                    {busyAction === 'qr-generate' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    {busyAction === 'qr-generate' ? 'Regenerating...' : 'Regenerate'}
                   </button>
                   <button
                     onClick={revokeQr}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold"
+                    disabled={busyAction !== null}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold disabled:opacity-60"
                   >
-                    <Ban className="w-3.5 h-3.5" /> Revoke
+                    {busyAction === 'qr-revoke' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Ban className="w-3.5 h-3.5" />
+                    )}
+                    {busyAction === 'qr-revoke' ? 'Revoking...' : 'Revoke'}
                   </button>
                 </div>
               </div>
@@ -215,10 +243,11 @@ export function StaffDashboardPage() {
                 <p className="text-sm text-slate-600">No active QR code for this hostel.</p>
                 <button
                   onClick={generateQr}
-                  disabled={busy}
-                  className="px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold"
+                  disabled={busyAction !== null}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold disabled:opacity-60"
                 >
-                  Generate QR Code
+                  {busyAction === 'qr-generate' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {busyAction === 'qr-generate' ? 'Generating QR...' : 'Generate QR Code'}
                 </button>
               </div>
             )}
@@ -254,19 +283,32 @@ export function StaffDashboardPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={regenerateCode}
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold hover:bg-[#D94E32]"
+                disabled={busyAction !== null}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold hover:bg-[#D94E32] disabled:opacity-60"
               >
-                <RefreshCw className="w-3.5 h-3.5" />{' '}
-                {accessCode ? 'Regenerate Code' : 'Generate Code'}
+                {busyAction === 'code-generate' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {busyAction === 'code-generate'
+                  ? 'Generating...'
+                  : accessCode
+                    ? 'Regenerate Code'
+                    : 'Generate Code'}
               </button>
               {accessCode && (
                 <button
                   onClick={revokeCode}
-                  disabled={busy}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold"
+                  disabled={busyAction !== null}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold disabled:opacity-60"
                 >
-                  <Ban className="w-3.5 h-3.5" /> Revoke Code
+                  {busyAction === 'code-revoke' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Ban className="w-3.5 h-3.5" />
+                  )}
+                  {busyAction === 'code-revoke' ? 'Revoking...' : 'Revoke Code'}
                 </button>
               )}
             </div>

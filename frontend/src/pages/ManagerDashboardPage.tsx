@@ -599,14 +599,15 @@ export function ManagerDashboardPage() {
                     <button
                       onClick={generateQr}
                       disabled={qrBusy}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold disabled:opacity-60"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                      {qrBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      {qrBusy ? 'Working...' : 'Regenerate'}
                     </button>
                     <button
                       onClick={revokeQr}
                       disabled={qrBusy}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold disabled:opacity-60"
                     >
                       <Ban className="w-3.5 h-3.5" /> Revoke
                     </button>
@@ -618,9 +619,10 @@ export function ManagerDashboardPage() {
                   <button
                     onClick={generateQr}
                     disabled={qrBusy}
-                    className="px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold disabled:opacity-60"
                   >
-                    Generate QR Code
+                    {qrBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {qrBusy ? 'Generating QR...' : 'Generate QR Code'}
                   </button>
                 </div>
               )}
@@ -652,10 +654,10 @@ export function ManagerDashboardPage() {
                 <button
                   onClick={regenerateCode}
                   disabled={qrBusy}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold hover:bg-[#D94E32]"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold hover:bg-[#D94E32] disabled:opacity-60"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />{' '}
-                  {accessCode ? 'Regenerate Code' : 'Generate Code'}
+                  {qrBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  {qrBusy ? 'Generating...' : accessCode ? 'Regenerate Code' : 'Generate Code'}
                 </button>
                 {accessCode && (
                   <button
