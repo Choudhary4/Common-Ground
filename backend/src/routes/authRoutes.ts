@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/auth.js';
 import { authRateLimiter } from '../middleware/rateLimit.js';
 import { createSessionAndSetCookie, revokeSessionAndClearCookie } from '../services/sessionService.js';
 import { recordAuditLog } from '../services/auditService.js';
+import { emitToHostel } from '../services/socketService.js';
 
 const router = Router();
 
@@ -61,6 +62,8 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
       eventType: 'TRAVELLER_ONBOARDED',
       isDemo: hostel.isDemo,
     });
+
+    emitToHostel(hostel._id.toString(), 'social:updated', { hostelId: hostel._id.toString() });
 
     res.status(201).json({
       user: {

@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import {
   SocialStatus,
   User,
+  Session,
   Activity,
   Notification,
   Report,
@@ -76,6 +77,7 @@ router.delete('/status', async (req, res, next) => {
 router.get('/discover', async (req, res, next) => {
   try {
     const hostelId = req.auth!.hostelId!;
+    const now = new Date();
     const currentUser = await User.findById(req.auth!.userId).lean();
     const myBlockedIds = new Set((currentUser?.blockedUserIds ?? []).map((id) => id.toString()));
 
@@ -90,42 +92,68 @@ router.get('/discover', async (req, res, next) => {
       myBlockedIds.add(u._id.toString());
     }
 
-    const activeStatuses = await SocialStatus.find({
+    const [activeSessions, activeStatuses] = await Promise.all([
+      Session.find({
+        hostelId,
+        revokedAt: null,
+        expiresAt: { $gt: now },
+      })
+        .select('userId')
+        .lean(),
+      SocialStatus.find({
+        hostelId,
+        expiresAt: { $gt: now },
+      })
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    const activeUserIdSet = new Set(
+      activeSessions
+        .map((s) => s.userId.toString())
+        .filter((id) => id !== req.auth!.userId.toString() && !myBlockedIds.has(id))
+    );
+    for (const s of activeStatuses) {
+      const id = s.userId.toString();
+      if (id !== req.auth!.userId.toString() && !myBlockedIds.has(id)) {
+        activeUserIdSet.add(id);
+      }
+    }
+
+    const users = await User.find({
+      _id: { $in: [...activeUserIdSet] },
       hostelId,
-      expiresAt: { $gt: new Date() },
+      role: 'TRAVELLER',
+      status: 'ACTIVE',
     })
+      .select('_id nickname interests createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
-    const userIds = activeStatuses
-      .map((s) => s.userId)
-      .filter((id) => id.toString() !== req.auth!.userId.toString() && !myBlockedIds.has(id.toString()));
+    const statusMap = new Map(activeStatuses.map((s) => [s.userId.toString(), s]));
 
-    const users = await User.find({
-      _id: { $in: userIds },
-      hostelId,
-      status: 'ACTIVE',
-    })
-      .select('_id nickname interests')
-      .lean();
-
-    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
-
-    const travellers = activeStatuses
-      .filter((s) => userMap.has(s.userId.toString()))
-      .map((s) => {
-        const u = userMap.get(s.userId.toString())!;
+    const travellers = users
+      .map((u) => {
+        const s = statusMap.get(u._id.toString());
         return {
           userId: u._id,
           nickname: u.nickname,
           interests: u.interests ?? [],
-          status: s.status,
-          expiresAt: s.expiresAt,
+          status: s?.status ?? null,
+          expiresAt: s?.expiresAt ?? null,
         };
+      })
+      .sort((a, b) => {
+        if (a.status && !b.status) return -1;
+        if (!a.status && b.status) return 1;
+        return 0;
       });
 
+    const openCount = travellers.filter((t) => t.status !== null).length;
+
     res.json({
-      openCount: travellers.length,
+      openCount,
+      totalCount: travellers.length,
       travellers,
     });
   } catch (err) {
@@ -148,14 +176,13 @@ router.post('/invite', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), actionRateLim
       return;
     }
 
-    const [targetUser, targetStatus, activity] = await Promise.all([
+    const [targetUser, activity] = await Promise.all([
       User.findOne({ _id: targetUserId, hostelId, status: 'ACTIVE' }).lean(),
-      SocialStatus.findOne({ userId: targetUserId, hostelId, expiresAt: { $gt: new Date() } }).lean(),
       Activity.findOne({ _id: activityId, hostelId, status: 'OPEN' }).lean(),
     ]);
 
-    if (!targetUser || !targetStatus) {
-      res.status(404).json({ error: 'Traveller is not currently available for invitations' });
+    if (!targetUser) {
+      res.status(404).json({ error: 'Traveller not found in this hostel' });
       return;
     }
 

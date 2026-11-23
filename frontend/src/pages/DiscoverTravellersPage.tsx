@@ -10,8 +10,8 @@ interface OptedInTraveller {
   userId: string;
   nickname: string;
   interests: string[];
-  status: SocialStatusValue;
-  expiresAt: string;
+  status: SocialStatusValue | null;
+  expiresAt: string | null;
 }
 
 export function DiscoverTravellersPage() {
@@ -96,7 +96,7 @@ export function DiscoverTravellersPage() {
         <div>
           <h1 className="text-xl font-extrabold text-slate-900">Discover Travellers</h1>
           <p className="text-xs text-slate-500">
-            Only travellers who opted in with a social status at your hostel appear here.
+            Active travellers staying at your hostel right now ({travellers.length}).
           </p>
         </div>
 
@@ -126,11 +126,17 @@ export function DiscoverTravellersPage() {
                 className="bg-white rounded-2xl border border-amber-200/80 p-4 flex items-start justify-between gap-3"
               >
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-slate-900 text-sm">{t.nickname}</h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF0EC] text-[#D94E32]">
-                      {formatSocialStatus(t.status)}
-                    </span>
+                    {t.status ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF0EC] text-[#D94E32]">
+                        {formatSocialStatus(t.status)}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500">
+                        No vibe set
+                      </span>
+                    )}
                   </div>
                   {t.interests.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
