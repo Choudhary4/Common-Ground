@@ -1,0 +1,17 @@
+{
+  "name": "common-ground",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Common Ground — A Social Connection Platform for goSTOPS",
+  "scripts": {
+    "dev": "concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend test",
+    "seed": "npm --prefix backend run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
