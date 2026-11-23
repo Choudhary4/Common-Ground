@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Radar, Users, PlusCircle, CalendarCheck, Bell, BellRing, X } from 'lucide-react';
+import {
+  Broadcast,
+  UsersThree,
+  PlusCircle,
+  CalendarCheck,
+  Bell,
+  BellRinging,
+  X,
+} from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
@@ -80,8 +88,8 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname]);
 
   const navItems = [
-    { to: '/app', label: 'Radar', icon: Radar },
-    { to: '/app/discover', label: 'Travellers', icon: Users },
+    { to: '/app', label: 'Radar', icon: Broadcast },
+    { to: '/app/discover', label: 'Travellers', icon: UsersThree },
     { to: '/app/activities/new', label: 'Host', icon: PlusCircle },
     { to: '/app/my-activities', label: 'My Plans', icon: CalendarCheck },
   ];
@@ -117,7 +125,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
               className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] transition-colors text-[#111c2d] border border-[#e0bfb8]/40"
               aria-label="Notifications"
             >
-              <Bell className="w-[18px] h-[18px]" />
+              <Bell weight="duotone" className="w-[20px] h-[20px]" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#a93017] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -141,7 +149,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
         {showPushPrompt && (
           <div className="mb-3 p-3 rounded-2xl bg-white border border-[#e0bfb8]/40 flex items-center justify-between gap-2 shadow-xs">
             <div className="flex items-center gap-2">
-              <BellRing className="w-4 h-4 text-[#a93017] shrink-0" />
+              <BellRinging weight="duotone" className="w-4 h-4 text-[#a93017] shrink-0" />
               <p className="text-[11px] text-[#59413c]">
                 <strong className="text-[#111c2d]">Mobile alerts</strong> for invites &amp; joins
               </p>
@@ -185,7 +193,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <div className="relative flex items-center justify-center">
-                  <Icon className="w-5 h-5" />
+                  <Icon weight={active ? 'fill' : 'duotone'} className="w-5 h-5" />
                   {active && (
                     <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   )}

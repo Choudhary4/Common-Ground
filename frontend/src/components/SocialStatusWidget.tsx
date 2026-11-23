@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Coffee, Users, Compass, X } from 'lucide-react';
+import { Sparkle, Coffee, UsersThree, Compass, X } from '@phosphor-icons/react';
 import { apiRequest } from '../lib/api';
 
 export type SocialStatusValue =
@@ -12,13 +12,13 @@ export const SOCIAL_STATUS_OPTIONS: Array<{
   value: SocialStatusValue;
   label: string;
   hint: string;
-  icon: typeof Sparkles;
+  icon: typeof Sparkle;
 }> = [
   {
     value: 'OPEN_TO_MEETING',
     label: 'Open to meeting',
     hint: 'Happy to say hi & chat',
-    icon: Sparkles,
+    icon: Sparkle,
   },
   {
     value: 'UP_FOR_ACTIVITIES',
@@ -30,7 +30,7 @@ export const SOCIAL_STATUS_OPTIONS: Array<{
     value: 'LOOKING_FOR_COMPANY',
     label: 'Looking for company',
     hint: 'Anyone heading out?',
-    icon: Users,
+    icon: UsersThree,
   },
   {
     value: 'JUST_CHILLING',
@@ -100,7 +100,7 @@ export function SocialStatusWidget({
 
   if (optimisticStatus && !expanded) {
     const activeOpt = SOCIAL_STATUS_OPTIONS.find((o) => o.value === optimisticStatus);
-    const ActiveIcon = activeOpt?.icon ?? Sparkles;
+    const ActiveIcon = activeOpt?.icon ?? Sparkle;
     return (
       <section className="bg-white rounded-2xl border border-[#E85D3F]/30 px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-2.5 min-w-0">

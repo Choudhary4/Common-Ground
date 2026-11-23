@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Loader2, MapPin } from 'lucide-react';
+import {
+  Plus,
+  CircleNotch,
+  MapPin,
+  Fire,
+  GameController,
+  Coffee,
+  Compass,
+  ForkKnife,
+  SquaresFour,
+} from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { type SocialStatusValue } from '../components/SocialStatusWidget';
 import { ActivityCard, type ActivitySummary } from '../components/ActivityCard';
@@ -10,12 +20,12 @@ import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
 
 const FILTER_CHIPS = [
-  { key: 'all', category: 'ALL', label: 'All Active' },
-  { key: 'starting_soon', category: 'ALL', label: '🔥 Happening Soon' },
-  { key: 'all', category: 'GAMES', label: '🃏 Games' },
-  { key: 'all', category: 'SOCIAL', label: '☕ Social' },
-  { key: 'all', category: 'EXPLORATION', label: '🌅 Exploration' },
-  { key: 'all', category: 'FOOD', label: '🍛 Food' },
+  { key: 'all', category: 'ALL', label: 'All Active', icon: SquaresFour },
+  { key: 'starting_soon', category: 'ALL', label: 'Happening Soon', icon: Fire },
+  { key: 'all', category: 'GAMES', label: 'Games', icon: GameController },
+  { key: 'all', category: 'SOCIAL', label: 'Social', icon: Coffee },
+  { key: 'all', category: 'EXPLORATION', label: 'Exploration', icon: Compass },
+  { key: 'all', category: 'FOOD', label: 'Food', icon: ForkKnife },
 ];
 
 export function TravellerDashboard() {
@@ -81,7 +91,7 @@ export function TravellerDashboard() {
         {/* Top Location & Host Micro-Bar */}
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-xs border border-[#e0bfb8]/35">
-            <MapPin className="w-4 h-4 text-emerald-600" />
+            <MapPin weight="fill" className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-bold text-[#111c2d]">
               {user?.hostelName ?? 'Your Hostel'}
             </span>
@@ -90,7 +100,7 @@ export function TravellerDashboard() {
             to="/app/activities/new"
             className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200/70 px-3 py-1.5 rounded-full text-xs font-bold text-amber-900 transition active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 text-[#a93017]" /> Host Plan
+            <Plus weight="bold" className="w-3.5 h-3.5 text-[#a93017]" /> Host Plan
           </Link>
         </div>
 
@@ -107,18 +117,23 @@ export function TravellerDashboard() {
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
           {FILTER_CHIPS.map((chip, idx) => {
             const active = activeChipIdx === idx;
+            const ChipIcon = chip.icon;
             return (
               <button
                 key={chip.label}
                 type="button"
                 onClick={() => setActiveChipIdx(idx)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-bold transition ${
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold transition ${
                   active
                     ? 'bg-[#14241E] text-white shadow-sm'
                     : 'bg-white text-[#59413c] border border-[#e0bfb8]/35 hover:bg-[#f0f3ff] shadow-2xs'
                 }`}
               >
-                {idx === 0 ? `${chip.label} (${activities.length})` : chip.label}
+                <ChipIcon
+                  weight="duotone"
+                  className={`w-3.5 h-3.5 ${active ? 'text-emerald-300' : 'text-[#a93017]'}`}
+                />
+                <span>{idx === 0 ? `${chip.label} (${activities.length})` : chip.label}</span>
               </button>
             );
           })}
@@ -144,7 +159,7 @@ export function TravellerDashboard() {
         {/* Activity Cards */}
         {loading ? (
           <div className="py-10 flex justify-center text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin" />
+            <CircleNotch className="w-6 h-6 animate-spin" />
           </div>
         ) : activities.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-8 text-center shadow-xs">

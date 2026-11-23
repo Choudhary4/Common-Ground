@@ -1,12 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Sparkles, Globe, Lock, Calendar, Clock, MapPin, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  CircleNotch,
+  Sparkle,
+  GlobeHemisphereWest,
+  LockSimple,
+  CalendarBlank,
+  Clock,
+  MapPin,
+  UsersThree,
+  Coffee,
+  GameController,
+  Compass,
+  ForkKnife,
+} from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest, ApiError } from '../lib/api';
 
 const QUICK_TEMPLATES = [
   {
-    label: '☕ Chai & Chat',
+    label: 'Chai & Chat',
+    icon: Coffee,
     title: 'Chai & Conversations',
     description: 'Grabbing masala chai in the common room—come say hi!',
     category: 'SOCIAL',
@@ -14,7 +29,8 @@ const QUICK_TEMPLATES = [
     maxParticipants: 8,
   },
   {
-    label: '🃏 UNO / Cards',
+    label: 'UNO / Cards',
+    icon: GameController,
     title: 'UNO & Card Games',
     description: 'Casual card games, beginners totally welcome!',
     category: 'GAMES',
@@ -22,7 +38,8 @@ const QUICK_TEMPLATES = [
     maxParticipants: 6,
   },
   {
-    label: '🌅 Evening Walk',
+    label: 'Evening Walk',
+    icon: Compass,
     title: 'Sunset / City Walk',
     description: 'Exploring nearby streets and grabbing street snacks together.',
     category: 'EXPLORATION',
@@ -30,7 +47,8 @@ const QUICK_TEMPLATES = [
     maxParticipants: 6,
   },
   {
-    label: '🍛 Group Dinner',
+    label: 'Group Dinner',
+    icon: ForkKnife,
     title: 'Group Dinner Out',
     description: 'Heading out to a local spot for dinner—anyone want to join?',
     category: 'FOOD',
@@ -165,12 +183,13 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
             {mode === 'create' && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold text-[#59413c] flex items-center gap-1 mb-2 uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5 text-[#a93017]" /> 1-Tap Quick Ideas
+                <p className="text-[11px] font-bold text-[#59413c] flex items-center gap-1.5 mb-2 uppercase tracking-wider">
+                  <Sparkle weight="duotone" className="w-3.5 h-3.5 text-[#a93017]" /> 1-Tap Quick Ideas
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {QUICK_TEMPLATES.map((tpl) => {
                     const active = selectedTpl === tpl.label;
+                    const TplIcon = tpl.icon;
                     return (
                       <button
                         key={tpl.label}
@@ -183,13 +202,17 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
                           setMeetingPoint(tpl.meetingPoint);
                           setMaxParticipants(tpl.maxParticipants);
                         }}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold text-left transition active:scale-[0.98] border ${
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left inline-flex items-center gap-2 transition active:scale-[0.98] border ${
                           active
                             ? 'bg-[#14241E] text-white border-[#14241E] shadow-xs'
                             : 'bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] border-[#e0bfb8]/25'
                         }`}
                       >
-                        {tpl.label}
+                        <TplIcon
+                          weight="duotone"
+                          className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-300' : 'text-[#a93017]'}`}
+                        />
+                        <span>{tpl.label}</span>
                       </button>
                     );
                   })}
@@ -251,7 +274,7 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-[#a93017]" /> Max Spots
+                    <UsersThree weight="duotone" className="w-4 h-4 text-[#a93017]" /> Max Spots
                   </label>
                   <input
                     type="number"
@@ -269,7 +292,7 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="p-3.5 rounded-2xl bg-[#f0f3ff] border border-[#e0bfb8]/25 space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-emerald-700" /> Date
+                    <CalendarBlank weight="duotone" className="w-4 h-4 text-emerald-700" /> Date
                   </label>
                   <input
                     type="date"
@@ -336,8 +359,9 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <Globe
-                        className={`w-3.5 h-3.5 ${
+                      <GlobeHemisphereWest
+                        weight="duotone"
+                        className={`w-4 h-4 ${
                           joinMode === 'PUBLIC' ? 'text-emerald-400' : 'text-slate-400'
                         }`}
                       />
@@ -361,8 +385,9 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <Lock
-                        className={`w-3.5 h-3.5 ${
+                      <LockSimple
+                        weight="duotone"
+                        className={`w-4 h-4 ${
                           joinMode === 'APPROVAL' ? 'text-amber-400' : 'text-slate-400'
                         }`}
                       />
@@ -384,7 +409,7 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 disabled={saving}
                 className="w-full h-12 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-60"
               >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving && <CircleNotch className="w-4 h-4 animate-spin" />}
                 {saving ? 'Publishing...' : mode === 'edit' ? 'Save Changes' : 'Publish Activity'}
               </button>
             </form>

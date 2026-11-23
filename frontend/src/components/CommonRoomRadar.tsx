@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Radio, SlidersHorizontal, X } from 'lucide-react';
+import {
+  Broadcast,
+  SlidersHorizontal,
+  X,
+  Sparkle,
+  GameController,
+  Coffee,
+  Headphones,
+  HandWaving,
+} from '@phosphor-icons/react';
 import {
   SOCIAL_STATUS_OPTIONS,
   formatSocialStatus,
@@ -23,11 +32,11 @@ const BUBBLE_POSITIONS = [
   'top-1/2 -translate-y-1/2 right-1 animate-float-alt',
 ];
 
-const VIBE_EMOJI: Record<SocialStatusValue, string> = {
-  OPEN_TO_MEETING: '✨',
-  UP_FOR_ACTIVITIES: '🎲',
-  LOOKING_FOR_COMPANY: '☕',
-  JUST_CHILLING: '🎧',
+const VIBE_ICON: Record<SocialStatusValue, typeof Sparkle> = {
+  OPEN_TO_MEETING: Sparkle,
+  UP_FOR_ACTIVITIES: GameController,
+  LOOKING_FOR_COMPANY: Coffee,
+  JUST_CHILLING: Headphones,
 };
 
 export function CommonRoomRadar({
@@ -122,7 +131,7 @@ export function CommonRoomRadar({
         <div className="relative z-10 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-300 p-0.5 shadow-[0_0_24px_rgba(16,185,129,0.45)] flex items-center justify-center">
             <div className="w-full h-full bg-[#14241E] rounded-full flex items-center justify-center">
-              <Radio className="w-5 h-5 text-emerald-300" />
+              <Broadcast weight="duotone" className="w-5 h-5 text-emerald-300" />
             </div>
           </div>
           <span className="text-[11px] font-extrabold text-[#111c2d] mt-1.5">
@@ -139,12 +148,12 @@ export function CommonRoomRadar({
             .join('')
             .slice(0, 2)
             .toUpperCase();
-          const emoji = t.status ? VIBE_EMOJI[t.status] : '👋';
+          const VibeIcon = t.status ? VIBE_ICON[t.status] : HandWaving;
           const isWarm = i % 2 === 1;
           return (
             <div
               key={t.userId}
-              className={`absolute ${BUBBLE_POSITIONS[i]} z-20 flex items-center gap-1.5 bg-[#14241E]/80 backdrop-blur-md border ${
+              className={`absolute ${BUBBLE_POSITIONS[i]} z-20 flex items-center gap-1.5 bg-[#14241E]/85 backdrop-blur-md border ${
                 isWarm ? 'border-amber-400/40' : 'border-white/25'
               } pl-1 pr-2.5 py-1 rounded-full shadow-md`}
             >
@@ -156,12 +165,16 @@ export function CommonRoomRadar({
                 {initials}
               </span>
               <span
-                className={`text-[10px] font-bold tracking-tight max-w-[92px] truncate ${
+                className={`text-[10px] font-bold tracking-tight max-w-[78px] truncate ${
                   isWarm ? 'text-amber-200' : 'text-white'
                 }`}
               >
-                {t.nickname} {emoji}
+                {t.nickname}
               </span>
+              <VibeIcon
+                weight="duotone"
+                className={`w-3.5 h-3.5 shrink-0 ${isWarm ? 'text-amber-300' : 'text-emerald-300'}`}
+              />
             </div>
           );
         })}

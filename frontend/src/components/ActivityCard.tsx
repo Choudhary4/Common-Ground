@@ -3,15 +3,15 @@ import { Link } from 'react-router-dom';
 import {
   MapPin,
   ArrowRight,
-  Loader2,
-  CheckCircle2,
+  CircleNotch,
+  CheckCircle,
   Coffee,
-  Gamepad2,
+  GameController,
   Compass,
-  Utensils,
-  Sparkles,
-  Hand,
-} from 'lucide-react';
+  ForkKnife,
+  Sparkle,
+  HandWaving,
+} from '@phosphor-icons/react';
 import { apiRequest } from '../lib/api';
 
 export interface ActivitySummary {
@@ -35,10 +35,10 @@ export interface ActivitySummary {
 
 const CATEGORY_ICON: Record<string, typeof Coffee> = {
   SOCIAL: Coffee,
-  GAMES: Gamepad2,
+  GAMES: GameController,
   EXPLORATION: Compass,
-  FOOD: Utensils,
-  OTHER: Sparkles,
+  FOOD: ForkKnife,
+  OTHER: Sparkle,
 };
 
 export function ActivityCard({
@@ -58,7 +58,7 @@ export function ActivityCard({
     100,
     Math.round((activity.confirmedCount / Math.max(1, activity.maxParticipants)) * 100)
   );
-  const CatIcon = CATEGORY_ICON[activity.category] ?? Sparkles;
+  const CatIcon = CATEGORY_ICON[activity.category] ?? Sparkle;
 
   const start = new Date(activity.scheduledAt);
   const timeLabel = start.toLocaleString([], {
@@ -123,7 +123,7 @@ export function ActivityCard({
           </span>
           <span>•</span>
           <span className="inline-flex items-center gap-0.5 text-[#a93017] font-semibold">
-            <MapPin className="w-3.5 h-3.5" /> {activity.meetingPoint}
+            <MapPin weight="fill" className="w-3.5 h-3.5" /> {activity.meetingPoint}
           </span>
         </p>
       </div>
@@ -136,7 +136,7 @@ export function ActivityCard({
               isOfficial ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
             }`}
           >
-            <CatIcon className="w-4 h-4" />
+            <CatIcon weight="duotone" className="w-5 h-5" />
           </div>
           <p className="text-xs text-[#59413c] line-clamp-2 leading-relaxed">{activity.description}</p>
         </div>
@@ -175,7 +175,7 @@ export function ActivityCard({
       {/* Full-Width Pill CTA */}
       {isJoinedNow ? (
         <div className="w-full h-11 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-bold flex items-center justify-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4" />
+          <CheckCircle weight="fill" className="w-4 h-4" />
           <span>You're in the Circle</span>
         </div>
       ) : isPendingNow ? (
@@ -194,9 +194,9 @@ export function ActivityCard({
           }`}
         >
           {joining ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <CircleNotch className="w-4 h-4 animate-spin" />
           ) : activity.joinMode === 'PUBLIC' ? null : (
-            <Hand className="w-4 h-4" />
+            <HandWaving weight="duotone" className="w-4 h-4" />
           )}
           <span>
             {joining
@@ -207,7 +207,7 @@ export function ActivityCard({
                 ? 'Quick RSVP · Join Circle'
                 : 'Request to Join'}
           </span>
-          {!joining && activity.joinMode === 'PUBLIC' && <ArrowRight className="w-4 h-4" />}
+          {!joining && activity.joinMode === 'PUBLIC' && <ArrowRight weight="bold" className="w-4 h-4" />}
         </button>
       ) : null}
     </Link>
