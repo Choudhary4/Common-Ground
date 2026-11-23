@@ -29,6 +29,7 @@ interface OptedInTraveller {
   status: SocialStatusValue | null;
   expiresAt: string | null;
   invited?: boolean;
+  isOnline?: boolean;
 }
 
 const VIBE_FILTERS = [
@@ -114,9 +115,22 @@ export function DiscoverTravellersPage() {
     void load();
     const socket = getSocket();
     const refresh = () => void load();
+    const onPresenceList = (data: { onlineUserIds: string[] }) => {
+      const set = new Set(data.onlineUserIds);
+      setTravellers((prev) => prev.map((t) => ({ ...t, isOnline: set.has(t.userId) })));
+    };
+    const onPresenceUpdate = (data: { userId: string; online: boolean }) => {
+      setTravellers((prev) =>
+        prev.map((t) => (t.userId === data.userId ? { ...t, isOnline: data.online } : t))
+      );
+    };
     socket.on('social:updated', refresh);
+    socket.on('presence:list', onPresenceList);
+    socket.on('presence:update', onPresenceUpdate);
     return () => {
       socket.off('social:updated', refresh);
+      socket.off('presence:list', onPresenceList);
+      socket.off('presence:update', onPresenceUpdate);
     };
   }, [load]);
 
@@ -316,15 +330,25 @@ export function DiscoverTravellersPage() {
                           className="w-11 h-11 rounded-2xl shadow-xs"
                           bgClass={isWarm ? 'bg-[#a93017] text-white' : 'bg-[#14241E] text-white'}
                         />
-                        {t.status && (
-                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+                        {t.isOnline && (
+                          <span
+                            title="Online"
+                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
+                          />
                         )}
                       </div>
 
                       <div className="min-w-0">
-                        <h3 className="font-extrabold text-[#111c2d] text-sm truncate">
-                          {t.nickname}
-                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-extrabold text-[#111c2d] text-sm truncate">
+                            {t.nickname}
+                          </h3>
+                          {t.isOnline && (
+                            <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                              Online
+                            </span>
+                          )}
+                        </div>
                         <span
                           className={`mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.bg} ${badge.text}`}
                         >

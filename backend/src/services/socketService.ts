@@ -6,6 +6,18 @@ import { hashToken } from '../utils/crypto.js';
 import { SESSION_COOKIE_NAME } from '../middleware/auth.js';
 
 let io: SocketIOServer | null = null;
+const onlineCountsByHostel = new Map<string, Map<string, number>>();
+
+export function getOnlineUserIds(hostelId: string): string[] {
+  const hostelMap = onlineCountsByHostel.get(hostelId);
+  if (!hostelMap) return [];
+  return [...hostelMap.keys()];
+}
+
+export function isUserOnline(hostelId: string, userId: string): boolean {
+  const hostelMap = onlineCountsByHostel.get(hostelId);
+  return Boolean(hostelMap && (hostelMap.get(userId) ?? 0) > 0);
+}
 
 function parseCookies(cookieHeader: string | undefined): Record<string, string> {
   const result: Record<string, string> = {};
@@ -58,7 +70,37 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
   io.on('connection', (socket) => {
     const { userId, hostelId } = socket.data;
     if (userId) socket.join(`user:${userId}`);
-    if (hostelId) socket.join(`hostel:${hostelId}`);
+    if (hostelId) {
+      socket.join(`hostel:${hostelId}`);
+      if (userId) {
+        let hostelMap = onlineCountsByHostel.get(hostelId);
+        if (!hostelMap) {
+          hostelMap = new Map();
+          onlineCountsByHostel.set(hostelId, hostelMap);
+        }
+        const prev = hostelMap.get(userId) ?? 0;
+        hostelMap.set(userId, prev + 1);
+        if (prev === 0) {
+          io?.to(`hostel:${hostelId}`).emit('presence:update', { userId, online: true });
+        }
+      }
+      socket.emit('presence:list', { onlineUserIds: getOnlineUserIds(hostelId) });
+    }
+
+    socket.on('disconnect', () => {
+      if (hostelId && userId) {
+        const hostelMap = onlineCountsByHostel.get(hostelId);
+        if (hostelMap) {
+          const next = (hostelMap.get(userId) ?? 1) - 1;
+          if (next <= 0) {
+            hostelMap.delete(userId);
+            io?.to(`hostel:${hostelId}`).emit('presence:update', { userId, online: false });
+          } else {
+            hostelMap.set(userId, next);
+          }
+        }
+      }
+    });
   });
 
   return io;

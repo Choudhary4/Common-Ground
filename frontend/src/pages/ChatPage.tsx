@@ -28,6 +28,7 @@ interface RoomMember {
   userId: string;
   nickname: string;
   avatar: string | null;
+  online?: boolean;
 }
 
 interface ChatRoomItem {
@@ -65,6 +66,7 @@ interface TravellerProfile {
   avatar: string | null;
   interests: string[];
   socialStatus: string | null;
+  isOnline?: boolean;
   joinedAt: string;
   hostedActivities: Array<{
     _id: string;
@@ -88,6 +90,7 @@ export function ChatPage() {
   const { user } = useAuth();
 
   const [rooms, setRooms] = useState<ChatRoomItem[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [readBy, setReadBy] = useState<Record<string, string>>({});
@@ -166,6 +169,16 @@ export function ChatPage() {
     try {
       const res = await apiRequest<{ rooms: ChatRoomItem[] }>('/chat/rooms');
       setRooms(res.rooms);
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        for (const r of res.rooms) {
+          for (const m of r.members) {
+            if (m.online) next.add(m.userId);
+            else next.delete(m.userId);
+          }
+        }
+        return next;
+      });
     } finally {
       setLoadingRooms(false);
     }
@@ -228,16 +241,31 @@ export function ChatPage() {
       }
     };
     const onRoomCreated = () => void loadRooms();
+    const onPresenceList = (data: { onlineUserIds: string[] }) => {
+      setOnlineUserIds(new Set(data.onlineUserIds));
+    };
+    const onPresenceUpdate = (data: { userId: string; online: boolean }) => {
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        if (data.online) next.add(data.userId);
+        else next.delete(data.userId);
+        return next;
+      });
+    };
 
     socket.on('chat:message', onMessage);
     socket.on('chat:seen', onSeen);
     socket.on('chat:room_created', onRoomCreated);
     socket.on('chat:room_updated', onRoomCreated);
+    socket.on('presence:list', onPresenceList);
+    socket.on('presence:update', onPresenceUpdate);
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:seen', onSeen);
       socket.off('chat:room_created', onRoomCreated);
       socket.off('chat:room_updated', onRoomCreated);
+      socket.off('presence:list', onPresenceList);
+      socket.off('presence:update', onPresenceUpdate);
     };
   }, [roomId, loadRooms, user?.id]);
 
@@ -438,6 +466,13 @@ export function ChatPage() {
     activeRoom?.type === 'DIRECT'
       ? activeRoom.members.find((m) => m.userId !== user?.id) ?? null
       : null;
+  const isOtherOnline = Boolean(
+    directOtherMember && onlineUserIds.has(directOtherMember.userId)
+  );
+  const groupOnlineCount =
+    activeRoom?.type === 'GROUP'
+      ? activeRoom.members.filter((m) => onlineUserIds.has(m.userId)).length
+      : 0;
 
   // Conversation Thread View (Instagram-style fixed visualViewport; header stays pinned even with mobile keyboard)
   if (roomId) {
@@ -478,8 +513,15 @@ export function ChatPage() {
                     <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
                       {activeRoom.name}
                     </h2>
-                    <p className="text-[11px] text-[#59413c] truncate">
-                      Tap for group info · {activeRoom.members.length} members
+                    <p className="text-[11px] text-[#59413c] truncate flex items-center gap-1.5">
+                      {groupOnlineCount > 0 && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          {groupOnlineCount} online
+                        </span>
+                      )}
+                      {groupOnlineCount > 0 && <span>·</span>}
+                      <span>{activeRoom.members.length} members</span>
                     </p>
                   </div>
                 </button>
@@ -499,17 +541,30 @@ export function ChatPage() {
                 disabled={!directOtherMember}
                 className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-xl py-0.5 pr-2 hover:bg-[#f0f3ff]/80 transition disabled:hover:bg-transparent"
               >
-                <Avatar
-                  src={activeRoom?.avatar}
-                  name={activeRoom?.name ?? 'Chat'}
-                  className="w-9 h-9 rounded-xl shrink-0"
-                />
+                <div className="relative shrink-0">
+                  <Avatar
+                    src={activeRoom?.avatar}
+                    name={activeRoom?.name ?? 'Chat'}
+                    className="w-9 h-9 rounded-xl"
+                  />
+                  {isOtherOnline && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#f9f9ff]" />
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
                     {activeRoom?.name ?? 'Hostel Chat'}
                   </h2>
-                  <p className="text-[11px] text-[#59413c] truncate">
-                    Tap to view profile
+                  <p className="text-[11px] truncate flex items-center gap-1">
+                    {isOtherOnline ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <span className="text-emerald-600 font-bold">Online</span>
+                        <span className="text-[#59413c]">· Tap for profile</span>
+                      </>
+                    ) : (
+                      <span className="text-[#59413c]">Offline · Tap for profile</span>
+                    )}
                   </p>
                 </div>
               </button>
@@ -775,7 +830,12 @@ export function ChatPage() {
                         disabled={isMe}
                         className="flex items-center gap-2 min-w-0 text-left hover:opacity-85 disabled:hover:opacity-100"
                       >
-                        <Avatar src={m.avatar} name={m.nickname} className="w-7 h-7 rounded-full shrink-0" />
+                        <div className="relative shrink-0">
+                          <Avatar src={m.avatar} name={m.nickname} className="w-7 h-7 rounded-full" />
+                          {onlineUserIds.has(m.userId) && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#f0f3ff]" />
+                          )}
+                        </div>
                         <span className="font-bold text-[#111c2d] truncate">
                           {m.nickname} {isMe ? '(You)' : ''}
                         </span>
@@ -896,15 +956,30 @@ export function ChatPage() {
                 <div className="space-y-4">
                   {/* Avatar & Vibe */}
                   <div className="flex flex-col items-center text-center gap-2">
-                    <Avatar
-                      src={profileData.avatar}
-                      name={profileData.nickname}
-                      className="w-20 h-20 rounded-2xl shadow-sm"
-                    />
+                    <div className="relative">
+                      <Avatar
+                        src={profileData.avatar}
+                        name={profileData.nickname}
+                        className="w-20 h-20 rounded-2xl shadow-sm"
+                      />
+                      {(profileData.isOnline || onlineUserIds.has(profileData.userId)) && (
+                        <span
+                          title="Online"
+                          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white"
+                        />
+                      )}
+                    </div>
                     <div>
-                      <h4 className="text-lg font-extrabold text-[#111c2d]">
-                        {profileData.nickname}
-                      </h4>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <h4 className="text-lg font-extrabold text-[#111c2d]">
+                          {profileData.nickname}
+                        </h4>
+                        {(profileData.isOnline || onlineUserIds.has(profileData.userId)) && (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                            Online
+                          </span>
+                        )}
+                      </div>
                       {profileData.socialStatus ? (
                         <span className="mt-1 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#14241E] text-emerald-300 text-[11px] font-bold">
                           <Sparkle weight="fill" className="w-3 h-3" />
@@ -1078,43 +1153,61 @@ export function ChatPage() {
           </div>
         ) : (
           <div className="space-y-2.5">
-            {rooms.map((room) => (
-              <button
-                key={room._id}
-                type="button"
-                onClick={() => navigate(`/app/chat/${room._id}`)}
-                className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center gap-3 active:scale-[0.99]"
-              >
-                {room.type === 'GROUP' && !room.avatar ? (
-                  <div className="w-11 h-11 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
-                    <UsersThree weight="duotone" className="w-6 h-6" />
-                  </div>
-                ) : (
-                  <Avatar src={room.avatar} name={room.name} className="w-11 h-11 rounded-2xl" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-extrabold text-[#111c2d] truncate">{room.name}</p>
-                    <span className="text-[10px] font-semibold text-slate-400 shrink-0">
-                      {new Date(room.lastMessageAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className="text-xs text-[#59413c] truncate">
-                      {room.lastMessageText || 'Tap to start chatting'}
-                    </p>
-                    {(room.unreadCount ?? 0) > 0 && (
-                      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#a93017] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
-                        {room.unreadCount! > 99 ? '99+' : room.unreadCount}
-                      </span>
+            {rooms.map((room) => {
+              const roomHasOnline =
+                room.type === 'DIRECT'
+                  ? room.members.some(
+                      (m) => m.userId !== user?.id && onlineUserIds.has(m.userId)
+                    )
+                  : room.members.some(
+                      (m) => m.userId !== user?.id && onlineUserIds.has(m.userId)
+                    );
+              return (
+                <button
+                  key={room._id}
+                  type="button"
+                  onClick={() => navigate(`/app/chat/${room._id}`)}
+                  className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center gap-3 active:scale-[0.99]"
+                >
+                  <div className="relative shrink-0">
+                    {room.type === 'GROUP' && !room.avatar ? (
+                      <div className="w-11 h-11 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center">
+                        <UsersThree weight="duotone" className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <Avatar src={room.avatar} name={room.name} className="w-11 h-11 rounded-2xl" />
+                    )}
+                    {roomHasOnline && (
+                      <span
+                        title="Online"
+                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
+                      />
                     )}
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-extrabold text-[#111c2d] truncate">{room.name}</p>
+                      <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                        {new Date(room.lastMessageAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <p className="text-xs text-[#59413c] truncate">
+                        {room.lastMessageText || 'Tap to start chatting'}
+                      </p>
+                      {(room.unreadCount ?? 0) > 0 && (
+                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#a93017] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                          {room.unreadCount! > 99 ? '99+' : room.unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 

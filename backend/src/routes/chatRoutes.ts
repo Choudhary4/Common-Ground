@@ -4,7 +4,7 @@ import { Types } from 'mongoose';
 import { ChatRoom, ChatMessage, User, Notification } from '../models/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope } from '../middleware/rbac.js';
-import { emitToUser } from '../services/socketService.js';
+import { emitToUser, isUserOnline } from '../services/socketService.js';
 import { sendPushToUser } from '../services/pushService.js';
 
 const router = Router();
@@ -29,10 +29,12 @@ router.get('/rooms', async (req, res, next) => {
       rooms.map(async (r) => {
         const members = r.memberIds.map((id) => {
           const u = uMap.get(id.toString());
+          const uidStr = id.toString();
           return {
-            userId: id.toString(),
+            userId: uidStr,
             nickname: u?.nickname ?? 'Traveller',
             avatar: u?.avatar ?? null,
+            online: isUserOnline(hostelId.toString(), uidStr),
           };
         });
         const other = members.find((m) => m.userId !== userId.toString());

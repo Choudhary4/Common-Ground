@@ -15,7 +15,7 @@ import { env } from '../config/env.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope, requireRole } from '../middleware/rbac.js';
 import { actionRateLimiter } from '../middleware/rateLimit.js';
-import { emitToHostel, emitToUser } from '../services/socketService.js';
+import { emitToHostel, emitToUser, isUserOnline } from '../services/socketService.js';
 import { sendPushToUser } from '../services/pushService.js';
 
 const router = Router();
@@ -158,6 +158,7 @@ router.get('/discover', async (req, res, next) => {
           status: s?.status ?? null,
           expiresAt: s?.expiresAt ?? null,
           invited: invitedSet.has(u._id.toString()),
+          isOnline: isUserOnline(hostelId.toString(), u._id.toString()),
         };
       })
       .sort((a, b) => {
@@ -537,6 +538,7 @@ router.get('/profile/:userId', async (req, res, next) => {
         avatar: target.avatar ?? null,
         interests: target.interests ?? [],
         socialStatus: activeStatus?.status ?? null,
+        isOnline: isUserOnline(hostelId.toString(), target._id.toString()),
         joinedAt: target.createdAt,
         hostedActivities,
       },
