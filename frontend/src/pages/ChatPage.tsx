@@ -9,7 +9,6 @@ import {
   CircleNotch,
   X,
   Check,
-  Checks,
   UserPlus,
   UserMinus,
   SignOut,
@@ -376,19 +375,11 @@ export function ChatPage() {
                         </span>
                         {mine &&
                           (isSeen ? (
-                            <span title="Seen" className="inline-flex items-center">
-                              <Checks
-                                weight="bold"
-                                className="w-3.5 h-3.5 text-emerald-400"
-                              />
+                            <span className="font-semibold text-emerald-300">
+                              · Seen
                             </span>
                           ) : (
-                            <span title="Sent" className="inline-flex items-center">
-                              <Check
-                                weight="bold"
-                                className="w-3 h-3 text-emerald-200/50"
-                              />
-                            </span>
+                            <span className="text-emerald-200/50">· Sent</span>
                           ))}
                       </div>
                     </div>
