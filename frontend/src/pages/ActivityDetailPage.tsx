@@ -2,19 +2,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Calendar,
+  ArrowRight,
+  CalendarBlank,
   MapPin,
-  Users,
-  CheckCircle2,
-  Clock,
+  UsersThree,
+  CheckCircle,
+  GlobeHemisphereWest,
+  LockSimple,
   Flag,
-  Edit3,
+  PencilSimple,
   XCircle,
   Check,
   X,
-  Award,
-  Loader2,
-} from 'lucide-react';
+  Medal,
+  CircleNotch,
+  Crown,
+  SignOut,
+  HandWaving,
+} from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest, ApiError } from '../lib/api';
 import { getSocket } from '../lib/socket';
@@ -184,31 +189,39 @@ export function ActivityDetailPage() {
     setBanner('Report submitted to hostel manager.');
   };
 
+  const isOfficial = activity?.creatorType === 'HOSTEL_MANAGER';
+  const spotsLeft = activity ? Math.max(0, activity.maxParticipants - activity.confirmedCount) : 0;
+  const pct = activity
+    ? Math.min(100, Math.round((activity.confirmedCount / Math.max(1, activity.maxParticipants)) * 100))
+    : 0;
+
   return (
     <TravellerLayout>
       <div className="space-y-4">
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#e0bfb8]/40 text-xs font-bold text-[#59413c] hover:text-[#111c2d] shadow-2xs transition"
         >
-          <ArrowLeft className="w-4 h-4" /> Back
+          <ArrowLeft weight="bold" className="w-3.5 h-3.5" /> Back
         </button>
 
         {loading ? (
           <div className="py-12 flex justify-center text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin" />
+            <CircleNotch className="w-6 h-6 animate-spin" />
           </div>
         ) : !activity ? (
-          <div className="bg-white rounded-2xl p-6 text-center text-sm text-rose-600">{error}</div>
+          <div className="bg-white rounded-2xl p-6 text-center text-sm font-semibold text-rose-600 border border-rose-200">
+            {error}
+          </div>
         ) : (
           <>
             {banner && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold flex items-start gap-2.5 shadow-2xs">
+                <CheckCircle weight="fill" className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <p>{banner}</p>
                   {activity.isJoined && (
-                    <p className="text-xs font-normal text-emerald-700 mt-0.5">
+                    <p className="text-xs font-medium text-emerald-700 mt-0.5">
                       Meet everyone at {activity.meetingPoint} at{' '}
                       {new Date(activity.scheduledAt).toLocaleTimeString([], {
                         hour: '2-digit',
@@ -222,197 +235,285 @@ export function ActivityDetailPage() {
             )}
 
             {error && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
                 {error}
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-amber-200/80 p-5 sm:p-6 space-y-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {activity.creatorType === 'HOSTEL_MANAGER' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF0EC] text-[#D94E32]">
-                      <Award className="w-3.5 h-3.5" /> Official Hostel Activity
+            {/* Main Activity Card */}
+            <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 shadow-sm overflow-hidden relative">
+              <div
+                className={`h-1.5 bg-gradient-to-r ${
+                  isOfficial
+                    ? 'from-amber-500 via-orange-500 to-[#a93017]'
+                    : 'from-emerald-500 via-teal-500 to-[#00685d]'
+                }`}
+              />
+
+              <div className="p-5 space-y-4">
+                {/* Badges & Report */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {isOfficial ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                        <Medal weight="duotone" className="w-3.5 h-3.5" /> Official Hostel Event
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#6fd8c8]/30 text-[#00685d]">
+                        Traveller Hosted
+                      </span>
+                    )}
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
+                      {activity.category}
                     </span>
-                  )}
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-900">
-                    {activity.category}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                    {activity.status}
-                  </span>
-                </div>
-
-                {!activity.isCreator && (
-                  <button
-                    onClick={handleReport}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                    title="Report activity"
-                  >
-                    <Flag className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-extrabold text-slate-900">{activity.title}</h1>
-                <p className="text-xs text-slate-500 mt-1">
-                  Hosted by <span className="font-semibold text-slate-800">{activity.creatorNickname}</span>
-                </p>
-              </div>
-
-              <p className="text-sm text-slate-700 leading-relaxed">{activity.description}</p>
-
-              <div className="grid sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-[#FAF7F2] text-xs text-slate-700">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#E85D3F]" />
-                  <span>
-                    {new Date(activity.scheduledAt).toLocaleString([], {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-[#E85D3F]" />
-                  <span>{activity.meetingPoint}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#E85D3F]" />
-                  <span>
-                    {activity.confirmedCount} / {activity.maxParticipants} confirmed
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#E85D3F]" />
-                  <span>
-                    {activity.joinMode === 'PUBLIC' ? 'Instant Join' : 'Host Approval Required'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2.5 pt-2">
-                {!activity.isJoined &&
-                  activity.status === 'OPEN' &&
-                  activity.myJoinRequestStatus !== 'PENDING' && (
-                    <button
-                      onClick={handleJoin}
-                      disabled={busyAction !== null}
-                      className="flex-1 py-3 px-4 rounded-xl bg-[#E85D3F] hover:bg-[#D94E32] active:scale-[0.98] text-white font-semibold text-sm inline-flex items-center justify-center gap-2 transition disabled:opacity-60"
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                        activity.status === 'OPEN'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : activity.status === 'CANCELLED'
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
                     >
-                      {busyAction === 'join' && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {busyAction === 'join'
-                        ? activity.joinMode === 'PUBLIC'
-                          ? 'Joining...'
-                          : 'Sending Request...'
-                        : activity.joinMode === 'PUBLIC'
-                          ? 'Join Activity'
-                          : 'Request to Join'}
-                    </button>
-                  )}
-
-                {activity.myJoinRequestStatus === 'PENDING' && !activity.isJoined && (
-                  <div className="flex items-center gap-2 w-full justify-between p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
-                    <span>Pending host approval...</span>
-                    <button
-                      onClick={handleLeave}
-                      disabled={busyAction !== null}
-                      className="inline-flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-60"
-                    >
-                      {busyAction === 'leave' && <Loader2 className="w-3 h-3 animate-spin" />}
-                      {busyAction === 'leave' ? 'Withdrawing...' : 'Withdraw'}
-                    </button>
+                      {activity.status}
+                    </span>
                   </div>
-                )}
 
-                {activity.isJoined && ['OPEN', 'FULL'].includes(activity.status) && (
-                  <button
-                    onClick={handleLeave}
-                    disabled={busyAction !== null}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 active:scale-[0.98] transition disabled:opacity-60"
-                  >
-                    {busyAction === 'leave' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {busyAction === 'leave' ? 'Leaving...' : 'Leave Activity'}
-                  </button>
-                )}
-
-                {activity.canManage && ['OPEN', 'FULL'].includes(activity.status) && (
-                  <>
-                    <Link
-                      to={`/app/activities/${activity._id}/edit`}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 active:scale-[0.98] transition"
+                  {!activity.isCreator && (
+                    <button
+                      onClick={handleReport}
+                      className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                      title="Report activity"
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> Edit
-                    </Link>
+                      <Flag weight="duotone" className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Title & Host */}
+                <div>
+                  <h1 className="text-[24px] font-extrabold text-[#111c2d] leading-tight">
+                    {activity.title}
+                  </h1>
+                  <p className="text-xs text-[#59413c] mt-1">
+                    Hosted by{' '}
+                    <span className="font-bold text-[#111c2d]">{activity.creatorNickname}</span>
+                  </p>
+                </div>
+
+                <p className="text-sm text-[#59413c] leading-relaxed">{activity.description}</p>
+
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-[#f0f3ff] border border-[#e0bfb8]/25 text-xs">
+                  <div className="flex items-start gap-2">
+                    <CalendarBlank weight="duotone" className="w-4 h-4 text-[#a93017] shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase">When</p>
+                      <p className="font-bold text-[#111c2d]">
+                        {new Date(activity.scheduledAt).toLocaleString([], {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <MapPin weight="fill" className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Where</p>
+                      <p className="font-bold text-[#111c2d]">{activity.meetingPoint}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <UsersThree weight="duotone" className="w-4 h-4 text-[#a93017] shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Spots</p>
+                      <p className="font-bold text-[#111c2d]">
+                        {activity.confirmedCount} / {activity.maxParticipants} confirmed
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    {activity.joinMode === 'PUBLIC' ? (
+                      <GlobeHemisphereWest weight="duotone" className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                    ) : (
+                      <LockSimple weight="duotone" className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase">Entry</p>
+                      <p className="font-bold text-[#111c2d]">
+                        {activity.joinMode === 'PUBLIC' ? 'Instant Join' : 'Host Approval'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-semibold text-[#59413c]">
+                    <span>Circle capacity</span>
+                    <span>{spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} remaining</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-[#e7eeff] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        isOfficial ? 'bg-gradient-to-r from-amber-500 to-[#a93017]' : 'bg-[#00685d]'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons — Clean Primary + Secondary Grid */}
+                <div className="space-y-2.5 pt-1">
+                  {!activity.isJoined &&
+                    activity.status === 'OPEN' &&
+                    activity.myJoinRequestStatus !== 'PENDING' && (
+                      <button
+                        onClick={handleJoin}
+                        disabled={busyAction !== null}
+                        className="w-full h-12 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-[0.98] text-white font-bold text-sm inline-flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-60"
+                      >
+                        {busyAction === 'join' ? (
+                          <CircleNotch className="w-4 h-4 animate-spin" />
+                        ) : activity.joinMode === 'APPROVAL' ? (
+                          <HandWaving weight="duotone" className="w-4 h-4" />
+                        ) : null}
+                        <span>
+                          {busyAction === 'join'
+                            ? activity.joinMode === 'PUBLIC'
+                              ? 'Joining...'
+                              : 'Sending Request...'
+                            : activity.joinMode === 'PUBLIC'
+                              ? 'Quick RSVP · Join Circle'
+                              : 'Request to Join'}
+                        </span>
+                        {busyAction !== 'join' && activity.joinMode === 'PUBLIC' && (
+                          <ArrowRight weight="bold" className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+
+                  {activity.myJoinRequestStatus === 'PENDING' && !activity.isJoined && (
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900">
+                      <span>Pending host approval...</span>
+                      <button
+                        onClick={handleLeave}
+                        disabled={busyAction !== null}
+                        className="inline-flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-60"
+                      >
+                        {busyAction === 'leave' && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
+                        {busyAction === 'leave' ? 'Withdrawing...' : 'Withdraw'}
+                      </button>
+                    </div>
+                  )}
+
+                  {activity.canManage && ['OPEN', 'FULL'].includes(activity.status) && (
                     <button
                       onClick={handleComplete}
                       disabled={busyAction !== null}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 active:scale-[0.98] transition disabled:opacity-60"
+                      className="w-full h-11 rounded-full bg-[#14241E] hover:bg-emerald-950 active:scale-[0.98] text-emerald-300 font-bold text-xs inline-flex items-center justify-center gap-2 shadow-xs transition disabled:opacity-60"
                     >
                       {busyAction === 'complete' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <CircleNotch className="w-4 h-4 animate-spin" />
                       ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <CheckCircle weight="fill" className="w-4 h-4 text-emerald-400" />
                       )}
-                      {busyAction === 'complete' ? 'Completing...' : 'Mark Completed'}
+                      {busyAction === 'complete' ? 'Completing...' : 'Mark Activity Completed'}
                     </button>
-                    <button
-                      onClick={handleCancel}
-                      disabled={busyAction !== null}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 active:scale-[0.98] transition disabled:opacity-60"
-                    >
-                      {busyAction === 'cancel' ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5" />
+                  )}
+
+                  {['OPEN', 'FULL'].includes(activity.status) && (activity.isJoined || activity.canManage) && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {activity.canManage && (
+                        <Link
+                          to={`/app/activities/${activity._id}/edit`}
+                          className="h-10 rounded-xl bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] text-xs font-bold inline-flex items-center justify-center gap-1.5 transition"
+                        >
+                          <PencilSimple weight="duotone" className="w-4 h-4" /> Edit
+                        </Link>
                       )}
-                      {busyAction === 'cancel' ? 'Cancelling...' : 'Cancel'}
-                    </button>
-                  </>
-                )}
+                      {activity.isJoined && (
+                        <button
+                          onClick={handleLeave}
+                          disabled={busyAction !== null}
+                          className={`h-10 rounded-xl border border-[#e0bfb8]/50 bg-white hover:bg-slate-50 text-[#59413c] text-xs font-bold inline-flex items-center justify-center gap-1.5 transition disabled:opacity-60 ${
+                            !activity.canManage ? 'col-span-3' : ''
+                          }`}
+                        >
+                          {busyAction === 'leave' ? (
+                            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <SignOut weight="duotone" className="w-4 h-4" />
+                          )}
+                          {busyAction === 'leave' ? 'Leaving...' : 'Leave'}
+                        </button>
+                      )}
+                      {activity.canManage && (
+                        <button
+                          onClick={handleCancel}
+                          disabled={busyAction !== null}
+                          className="h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-bold inline-flex items-center justify-center gap-1.5 transition disabled:opacity-60"
+                        >
+                          {busyAction === 'cancel' ? (
+                            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <XCircle weight="duotone" className="w-4 h-4" />
+                          )}
+                          {busyAction === 'cancel' ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
+            {/* Pending Join Requests */}
             {activity.canManage && pendingRequests.length > 0 && (
-              <div className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3">
-                <h2 className="text-sm font-bold text-slate-900">
+              <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-5 space-y-3 shadow-xs">
+                <h2 className="text-sm font-extrabold text-[#111c2d]">
                   Pending Join Requests ({pendingRequests.length})
                 </h2>
                 <div className="space-y-2">
                   {pendingRequests.map((req) => (
                     <div
                       key={req.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-[#FAF7F2]"
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#f0f3ff]"
                     >
-                      <span className="text-sm font-semibold text-slate-800">{req.nickname}</span>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-full bg-[#14241E] text-emerald-300 font-bold text-xs flex items-center justify-center">
+                          {req.nickname.slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="text-sm font-bold text-[#111c2d]">{req.nickname}</span>
+                      </div>
+                      <div className="flex gap-1.5">
                         <button
                           onClick={() => resolveRequest(req.id, 'ACCEPT')}
                           disabled={busyAction !== null}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-60"
                         >
                           {busyAction === `ACCEPT:${req.id}` ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            <Check className="w-3.5 h-3.5" />
+                            <Check weight="bold" className="w-3.5 h-3.5" />
                           )}
-                          {busyAction === `ACCEPT:${req.id}` ? 'Accepting...' : 'Accept'}
+                          {busyAction === `ACCEPT:${req.id}` ? '...' : 'Accept'}
                         </button>
                         <button
                           onClick={() => resolveRequest(req.id, 'DECLINE')}
                           disabled={busyAction !== null}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold disabled:opacity-60"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold disabled:opacity-60"
                         >
                           {busyAction === `DECLINE:${req.id}` ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            <X className="w-3.5 h-3.5" />
+                            <X weight="bold" className="w-3.5 h-3.5" />
                           )}
-                          {busyAction === `DECLINE:${req.id}` ? 'Declining...' : 'Decline'}
+                          Decline
                         </button>
                       </div>
                     </div>
@@ -421,22 +522,36 @@ export function ActivityDetailPage() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3">
-              <h2 className="text-sm font-bold text-slate-900">
+            {/* Confirmed Participants */}
+            <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-5 space-y-3 shadow-xs">
+              <h2 className="text-sm font-extrabold text-[#111c2d]">
                 Confirmed Participants ({participants.length})
               </h2>
               <div className="flex flex-wrap gap-2">
-                {participants.map((p) => (
-                  <span
-                    key={p.userId}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FAF7F2] border border-amber-200/60 text-xs font-medium text-slate-800"
-                  >
-                    {p.nickname}
-                    {p.isHost && (
-                      <span className="text-[10px] font-bold text-[#E85D3F]">HOST</span>
-                    )}
-                  </span>
-                ))}
+                {participants.map((p) => {
+                  const initials = p.nickname
+                    .split(' ')
+                    .map((w) => w[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
+                  return (
+                    <div
+                      key={p.userId}
+                      className="inline-flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#f0f3ff] border border-[#e0bfb8]/30 text-xs font-bold text-[#111c2d]"
+                    >
+                      <span className="w-6 h-6 rounded-full bg-[#14241E] text-emerald-300 text-[10px] font-bold flex items-center justify-center">
+                        {initials}
+                      </span>
+                      <span>{p.nickname}</span>
+                      {p.isHost && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#14241E] text-amber-300 text-[9px] font-extrabold uppercase">
+                          <Crown weight="fill" className="w-2.5 h-2.5" /> Host
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
