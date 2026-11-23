@@ -503,16 +503,23 @@ export function ManagerDashboardPage() {
                     <div className="flex flex-wrap gap-2 pt-2">
                       <button
                         onClick={() => resolveReport(r._id, 'DISMISSED')}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold"
+                        disabled={busyId === r._id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold disabled:opacity-60"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Dismiss
+                        {busyId === r._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        Dismiss
                       </button>
                       {r.activity && (
                         <button
                           onClick={() =>
                             resolveReport(r._id, 'ACTION_TAKEN', { cancelActivity: true })
                           }
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold"
+                          disabled={busyId === r._id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold disabled:opacity-60"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Cancel Activity
                         </button>
@@ -522,7 +529,8 @@ export function ManagerDashboardPage() {
                           onClick={() =>
                             resolveReport(r._id, 'ACTION_TAKEN', { restrictUser: true })
                           }
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold"
+                          disabled={busyId === r._id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold disabled:opacity-60"
                         >
                           Restrict User
                         </button>

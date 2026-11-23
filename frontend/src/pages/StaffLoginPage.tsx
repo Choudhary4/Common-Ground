@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiRequest, ApiError } from '../lib/api';
 import { useAuth, type UserRole } from '../context/AuthContext';
 import { Footer } from '../components/Footer';
@@ -94,8 +94,9 @@ export function StaffLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition disabled:opacity-60"
+              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm inline-flex items-center justify-center gap-2 transition disabled:opacity-60"
             >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>

@@ -61,7 +61,7 @@ export function ActivityDetailPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,7 +105,7 @@ export function ActivityDetailPage() {
 
   const handleJoin = async () => {
     if (!id) return;
-    setBusy(true);
+    setBusyAction('join');
     setError(null);
     try {
       const res = await apiRequest<{ joined: boolean; message: string }>(`/activities/${id}/join`, {
@@ -116,13 +116,13 @@ export function ActivityDetailPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not join activity');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleLeave = async () => {
     if (!id) return;
-    setBusy(true);
+    setBusyAction('leave');
     try {
       await apiRequest(`/activities/${id}/leave`, { method: 'POST' });
       setBanner('You left the activity.');
@@ -130,36 +130,36 @@ export function ActivityDetailPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to leave');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleCancel = async () => {
     if (!id || !window.confirm('Cancel this activity for all participants?')) return;
-    setBusy(true);
+    setBusyAction('cancel');
     try {
       await apiRequest(`/activities/${id}/cancel`, { method: 'POST' });
       await load();
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const handleComplete = async () => {
     if (!id) return;
-    setBusy(true);
+    setBusyAction('complete');
     try {
       await apiRequest(`/activities/${id}/complete`, { method: 'POST' });
       setBanner('Activity marked as completed!');
       await load();
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const resolveRequest = async (reqId: string, decision: 'ACCEPT' | 'DECLINE') => {
     if (!id) return;
-    setBusy(true);
+    setBusyAction(`${decision}:${reqId}`);
     try {
       await apiRequest(`/activities/${id}/requests/${reqId}/resolve`, {
         method: 'POST',
@@ -169,7 +169,7 @@ export function ActivityDetailPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not resolve request');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -301,10 +301,17 @@ export function ActivityDetailPage() {
                   activity.myJoinRequestStatus !== 'PENDING' && (
                     <button
                       onClick={handleJoin}
-                      disabled={busy}
-                      className="flex-1 py-3 px-4 rounded-xl bg-[#E85D3F] hover:bg-[#D94E32] text-white font-semibold text-sm transition"
+                      disabled={busyAction !== null}
+                      className="flex-1 py-3 px-4 rounded-xl bg-[#E85D3F] hover:bg-[#D94E32] active:scale-[0.98] text-white font-semibold text-sm inline-flex items-center justify-center gap-2 transition disabled:opacity-60"
                     >
-                      {activity.joinMode === 'PUBLIC' ? 'Join Activity' : 'Request to Join'}
+                      {busyAction === 'join' && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {busyAction === 'join'
+                        ? activity.joinMode === 'PUBLIC'
+                          ? 'Joining...'
+                          : 'Sending Request...'
+                        : activity.joinMode === 'PUBLIC'
+                          ? 'Join Activity'
+                          : 'Request to Join'}
                     </button>
                   )}
 
@@ -313,10 +320,11 @@ export function ActivityDetailPage() {
                     <span>Pending host approval...</span>
                     <button
                       onClick={handleLeave}
-                      disabled={busy}
-                      className="text-rose-600 hover:underline"
+                      disabled={busyAction !== null}
+                      className="inline-flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-60"
                     >
-                      Withdraw
+                      {busyAction === 'leave' && <Loader2 className="w-3 h-3 animate-spin" />}
+                      {busyAction === 'leave' ? 'Withdrawing...' : 'Withdraw'}
                     </button>
                   </div>
                 )}
@@ -324,10 +332,11 @@ export function ActivityDetailPage() {
                 {activity.isJoined && ['OPEN', 'FULL'].includes(activity.status) && (
                   <button
                     onClick={handleLeave}
-                    disabled={busy}
-                    className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                    disabled={busyAction !== null}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 active:scale-[0.98] transition disabled:opacity-60"
                   >
-                    Leave Activity
+                    {busyAction === 'leave' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {busyAction === 'leave' ? 'Leaving...' : 'Leave Activity'}
                   </button>
                 )}
 
@@ -335,23 +344,33 @@ export function ActivityDetailPage() {
                   <>
                     <Link
                       to={`/app/activities/${activity._id}/edit`}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 active:scale-[0.98] transition"
                     >
                       <Edit3 className="w-3.5 h-3.5" /> Edit
                     </Link>
                     <button
                       onClick={handleComplete}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
+                      disabled={busyAction !== null}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 active:scale-[0.98] transition disabled:opacity-60"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Mark Completed
+                      {busyAction === 'complete' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      )}
+                      {busyAction === 'complete' ? 'Completing...' : 'Mark Completed'}
                     </button>
                     <button
                       onClick={handleCancel}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100"
+                      disabled={busyAction !== null}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 active:scale-[0.98] transition disabled:opacity-60"
                     >
-                      <XCircle className="w-3.5 h-3.5" /> Cancel
+                      {busyAction === 'cancel' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5" />
+                      )}
+                      {busyAction === 'cancel' ? 'Cancelling...' : 'Cancel'}
                     </button>
                   </>
                 )}
@@ -373,17 +392,27 @@ export function ActivityDetailPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => resolveRequest(req.id, 'ACCEPT')}
-                          disabled={busy}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
+                          disabled={busyAction !== null}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
                         >
-                          <Check className="w-3.5 h-3.5" /> Accept
+                          {busyAction === `ACCEPT:${req.id}` ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          {busyAction === `ACCEPT:${req.id}` ? 'Accepting...' : 'Accept'}
                         </button>
                         <button
                           onClick={() => resolveRequest(req.id, 'DECLINE')}
-                          disabled={busy}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold"
+                          disabled={busyAction !== null}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold disabled:opacity-60"
                         >
-                          <X className="w-3.5 h-3.5" /> Decline
+                          {busyAction === `DECLINE:${req.id}` ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <X className="w-3.5 h-3.5" />
+                          )}
+                          {busyAction === `DECLINE:${req.id}` ? 'Declining...' : 'Decline'}
                         </button>
                       </div>
                     </div>

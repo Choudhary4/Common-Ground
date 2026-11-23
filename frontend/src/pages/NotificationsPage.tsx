@@ -17,6 +17,7 @@ interface NotificationItem {
 export function NotificationsPage() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,9 +45,14 @@ export function NotificationsPage() {
   }, [load]);
 
   const markAllRead = async () => {
-    await apiRequest('/traveller/notifications/read-all', { method: 'POST' });
-    window.dispatchEvent(new Event('notifications:read-all'));
-    void load();
+    setMarkingAll(true);
+    try {
+      await apiRequest('/traveller/notifications/read-all', { method: 'POST' });
+      window.dispatchEvent(new Event('notifications:read-all'));
+      await load();
+    } finally {
+      setMarkingAll(false);
+    }
   };
 
   return (
@@ -57,9 +63,11 @@ export function NotificationsPage() {
           {items.some((i) => !i.readAt) && (
             <button
               onClick={markAllRead}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[#E85D3F] hover:underline"
+              disabled={markingAll}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#E85D3F] hover:underline disabled:opacity-60"
             >
-              <CheckCheck className="w-4 h-4" /> Mark all read
+              {markingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
+              {markingAll ? 'Marking...' : 'Mark all read'}
             </button>
           )}
         </div>

@@ -21,6 +21,7 @@ export function DiscoverTravellersPage() {
   const [inviteTarget, setInviteTarget] = useState<OptedInTraveller | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +53,7 @@ export function DiscoverTravellersPage() {
   const sendInvite = async () => {
     if (!inviteTarget || !selectedActivityId) return;
     setFeedback(null);
+    setSendingInvite(true);
     try {
       await apiRequest('/traveller/invite', {
         method: 'POST',
@@ -64,6 +66,8 @@ export function DiscoverTravellersPage() {
       setInviteTarget(null);
     } catch (err) {
       setFeedback(err instanceof ApiError ? err.message : 'Could not send invite');
+    } finally {
+      setSendingInvite(false);
     }
   };
 
@@ -200,9 +204,11 @@ export function DiscoverTravellersPage() {
                 </button>
                 <button
                   onClick={sendInvite}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#E85D3F] text-white hover:bg-[#D94E32]"
+                  disabled={sendingInvite}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#E85D3F] text-white hover:bg-[#D94E32] disabled:opacity-60"
                 >
-                  Send Invite
+                  {sendingInvite && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {sendingInvite ? 'Sending...' : 'Send Invite'}
                 </button>
               </div>
             </div>
