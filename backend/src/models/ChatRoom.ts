@@ -10,6 +10,7 @@ export interface IChatRoom extends Document {
   createdBy: Types.ObjectId;
   lastMessageText: string;
   lastMessageAt: Date;
+  lastReadAt: Map<string, Date>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +24,7 @@ const chatRoomSchema = new Schema<IChatRoom>(
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     lastMessageText: { type: String, default: '' },
     lastMessageAt: { type: Date, default: Date.now },
+    lastReadAt: { type: Map, of: Date, default: {} },
   },
   { timestamps: true }
 );

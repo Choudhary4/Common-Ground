@@ -22,6 +22,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
 
@@ -64,11 +65,15 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
     let active = true;
     const loadNotifs = async () => {
       try {
-        const res = await apiRequest<{ notifications: Array<{ readAt: string | null }> }>(
-          '/traveller/notifications'
-        );
+        const [notifRes, chatRes] = await Promise.all([
+          apiRequest<{ notifications: Array<{ readAt: string | null }> }>(
+            '/traveller/notifications'
+          ),
+          apiRequest<{ totalUnread?: number }>('/chat/rooms'),
+        ]);
         if (active) {
-          setUnreadCount(res.notifications.filter((n) => !n.readAt).length);
+          setUnreadCount(notifRes.notifications.filter((n) => !n.readAt).length);
+          setUnreadChats(chatRes.totalUnread ?? 0);
         }
       } catch {
         // ignore
@@ -96,11 +101,19 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
       showLocalAlert(payload as Parameters<typeof showLocalAlert>[0]);
     };
     const onReadAll = () => setUnreadCount(0);
+    const onChatMsg = (msg?: { senderId?: string }) => {
+      if (msg?.senderId && msg.senderId !== user?.id) {
+        void loadNotifs();
+      }
+    };
+    const onChatRead = () => void loadNotifs();
     socket.on('notification:new', onNew);
     socket.on('join_request:received', onNew);
     socket.on('join_request:accepted', onNew);
     socket.on('join_request:declined', onNew);
+    socket.on('chat:message', onChatMsg);
     window.addEventListener('notifications:read-all', onReadAll);
+    window.addEventListener('chat:read', onChatRead);
 
     return () => {
       active = false;
@@ -108,9 +121,11 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
       socket.off('join_request:received', onNew);
       socket.off('join_request:accepted', onNew);
       socket.off('join_request:declined', onNew);
+      socket.off('chat:message', onChatMsg);
       window.removeEventListener('notifications:read-all', onReadAll);
+      window.removeEventListener('chat:read', onChatRead);
     };
-  }, [location.pathname]);
+  }, [location.pathname, user?.id]);
 
   const navItems = [
     { to: '/app', label: 'Radar', icon: Broadcast },
@@ -227,9 +242,13 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
               >
                 <div className="relative flex items-center justify-center">
                   <Icon weight={active ? 'fill' : 'duotone'} className="w-5 h-5" />
-                  {active && (
+                  {item.to === '/app/chat' && unreadChats > 0 ? (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#a93017] text-white text-[9px] font-extrabold flex items-center justify-center ring-2 ring-[#14241E]">
+                      {unreadChats > 9 ? '9+' : unreadChats}
+                    </span>
+                  ) : active ? (
                     <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  )}
+                  ) : null}
                 </div>
                 <span className="text-[10px] font-bold tracking-tight mt-0.5">{item.label}</span>
               </Link>

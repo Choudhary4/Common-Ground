@@ -25,29 +25,40 @@ router.get('/rooms', async (req, res, next) => {
       .lean();
     const uMap = new Map(users.map((u) => [u._id.toString(), u]));
 
-    const enriched = rooms.map((r) => {
-      const members = r.memberIds.map((id) => {
-        const u = uMap.get(id.toString());
+    const enriched = await Promise.all(
+      rooms.map(async (r) => {
+        const members = r.memberIds.map((id) => {
+          const u = uMap.get(id.toString());
+          return {
+            userId: id.toString(),
+            nickname: u?.nickname ?? 'Traveller',
+            avatar: u?.avatar ?? null,
+          };
+        });
+        const other = members.find((m) => m.userId !== userId.toString());
+        const readMap = (r.lastReadAt ?? {}) as unknown as Record<string, Date>;
+        const lastRead = readMap[userId.toString()] ? new Date(readMap[userId.toString()]) : new Date(0);
+        const unreadCount = await ChatMessage.countDocuments({
+          roomId: r._id,
+          senderId: { $ne: userId },
+          createdAt: { $gt: lastRead },
+        });
         return {
-          userId: id.toString(),
-          nickname: u?.nickname ?? 'Traveller',
-          avatar: u?.avatar ?? null,
+          _id: r._id,
+          type: r.type,
+          name: r.type === 'GROUP' ? r.name : (other?.nickname ?? 'Traveller'),
+          avatar: r.type === 'DIRECT' ? (other?.avatar ?? null) : null,
+          createdBy: r.createdBy.toString(),
+          members,
+          lastMessageText: r.lastMessageText,
+          lastMessageAt: r.lastMessageAt,
+          unreadCount,
         };
-      });
-      const other = members.find((m) => m.userId !== userId.toString());
-      return {
-        _id: r._id,
-        type: r.type,
-        name: r.type === 'GROUP' ? r.name : (other?.nickname ?? 'Traveller'),
-        avatar: r.type === 'DIRECT' ? (other?.avatar ?? null) : null,
-        createdBy: r.createdBy.toString(),
-        members,
-        lastMessageText: r.lastMessageText,
-        lastMessageAt: r.lastMessageAt,
-      };
-    });
+      })
+    );
 
-    res.json({ rooms: enriched });
+    const totalUnread = enriched.reduce((sum, r) => sum + r.unreadCount, 0);
+    res.json({ rooms: enriched, totalUnread });
   } catch (err) {
     next(err);
   }
@@ -291,6 +302,11 @@ router.get('/rooms/:roomId/messages', async (req, res, next) => {
       return;
     }
 
+    await ChatRoom.updateOne(
+      { _id: room._id },
+      { $set: { [`lastReadAt.${myId.toString()}`]: new Date() } }
+    );
+
     const messages = await ChatMessage.find({ roomId: room._id, hostelId })
       .sort({ createdAt: 1 })
       .limit(100)
@@ -345,6 +361,7 @@ router.post('/rooms/:roomId/messages', async (req, res, next) => {
 
     room.lastMessageText = text;
     room.lastMessageAt = msg.createdAt;
+    room.lastReadAt.set(myId.toString(), msg.createdAt);
     await room.save();
 
     const payload = {

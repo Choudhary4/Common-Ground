@@ -34,6 +34,7 @@ interface ChatRoomItem {
   members: RoomMember[];
   lastMessageText: string;
   lastMessageAt: string;
+  unreadCount?: number;
 }
 
 interface ChatMessageItem {
@@ -92,6 +93,7 @@ export function ChatPage() {
     try {
       const res = await apiRequest<{ messages: ChatMessageItem[] }>(`/chat/rooms/${id}/messages`);
       setMessages(res.messages);
+      window.dispatchEvent(new Event('chat:read'));
     } finally {
       setLoadingMsgs(false);
     }
@@ -559,9 +561,16 @@ export function ChatPage() {
                       })}
                     </span>
                   </div>
-                  <p className="text-xs text-[#59413c] truncate mt-0.5">
-                    {room.lastMessageText || 'Tap to start chatting'}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className="text-xs text-[#59413c] truncate">
+                      {room.lastMessageText || 'Tap to start chatting'}
+                    </p>
+                    {(room.unreadCount ?? 0) > 0 && (
+                      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#a93017] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                        {room.unreadCount! > 99 ? '99+' : room.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
             ))}
