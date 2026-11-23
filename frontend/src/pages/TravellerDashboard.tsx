@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, Loader2 } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { SocialStatusWidget, type SocialStatusValue } from '../components/SocialStatusWidget';
 import { ActivityCard, type ActivitySummary } from '../components/ActivityCard';
@@ -102,19 +102,6 @@ export function TravellerDashboard() {
           openCount={openCount}
           onUpdated={loadData}
         />
-
-        <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/80 rounded-2xl px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <Users className="w-5 h-5 text-[#E85D3F]" />
-            <p className="text-xs sm:text-sm text-slate-700">
-              <span className="font-bold text-slate-900">{openCount}</span> opted-in{' '}
-              {openCount === 1 ? 'traveller' : 'travellers'} at {user?.hostelName}
-            </p>
-          </div>
-          <Link to="/app/discover" className="text-xs font-bold text-[#E85D3F] hover:underline">
-            Discover →
-          </Link>
-        </div>
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
