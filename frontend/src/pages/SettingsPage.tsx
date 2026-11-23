@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserX, Loader2 } from 'lucide-react';
+import { LogOut, UserX, Loader2, BellRing } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getCurrentPushSubscription,
+  isPushSupported,
+} from '../lib/push';
 
 export function SettingsPage() {
   const { logout, refreshAuth } = useAuth();
@@ -13,6 +19,9 @@ export function SettingsPage() {
   const [blockedUsers, setBlockedUsers] = useState<Array<{ _id: string; nickname: string }>>([]);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
 
   const load = async () => {
     const res = await apiRequest<{
@@ -27,7 +36,30 @@ export function SettingsPage() {
 
   useEffect(() => {
     void load();
+    void getCurrentPushSubscription().then((sub) => setPushEnabled(Boolean(sub)));
   }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushMsg(null);
+    try {
+      if (pushEnabled) {
+        await disablePushNotifications();
+        setPushEnabled(false);
+        setPushMsg('Mobile push notifications disabled.');
+      } else {
+        const ok = await enablePushNotifications();
+        setPushEnabled(ok);
+        setPushMsg(
+          ok
+            ? 'Mobile push notifications enabled!'
+            : 'Permission denied or not supported on this browser.'
+        );
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +139,37 @@ export function SettingsPage() {
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
+
+        <div className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <BellRing className="w-4 h-4 text-[#E85D3F]" />
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Mobile Push Notifications</h2>
+                <p className="text-xs text-slate-500">
+                  Receive alerts on your phone for invites &amp; join requests.
+                </p>
+              </div>
+            </div>
+            {isPushSupported() ? (
+              <button
+                type="button"
+                onClick={togglePush}
+                disabled={pushBusy}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition disabled:opacity-60 ${
+                  pushEnabled
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-[#E85D3F] text-white hover:bg-[#D94E32]'
+                }`}
+              >
+                {pushBusy ? 'Updating...' : pushEnabled ? 'Disable' : 'Enable'}
+              </button>
+            ) : (
+              <span className="text-xs text-slate-400">Not supported</span>
+            )}
+          </div>
+          {pushMsg && <p className="text-xs font-medium text-emerald-700">{pushMsg}</p>}
+        </div>
 
         <div className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3">
           <h2 className="text-sm font-bold text-slate-900">Blocked Travellers</h2>

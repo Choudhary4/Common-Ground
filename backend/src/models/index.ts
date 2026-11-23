@@ -11,3 +11,4 @@ export * from './Report.js';
 export * from './Notification.js';
 export * from './AuditLog.js';
 export * from './AnalyticsEvent.js';
+export * from './PushSubscription.js';

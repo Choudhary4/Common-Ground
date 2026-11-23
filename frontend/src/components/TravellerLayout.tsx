@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, Users, PlusCircle, CalendarCheck, Bell, Settings, MapPin } from 'lucide-react';
+import { Compass, Users, PlusCircle, CalendarCheck, Bell, Settings, MapPin, BellRing, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
+import { enablePushNotifications, getVapidPublicKey, isPushSupported } from '../lib/push';
 import { Footer } from './Footer';
 
 export function TravellerLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,37 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function checkPush() {
+      if (!isPushSupported() || Notification.permission !== 'default') return;
+      if (localStorage.getItem('cg_push_dismissed') === '1') return;
+      const key = await getVapidPublicKey();
+      if (active && key) setShowPushPrompt(true);
+    }
+    void checkPush();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleEnablePush = async () => {
+    setEnablingPush(true);
+    try {
+      await enablePushNotifications();
+      setShowPushPrompt(false);
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+
+  const dismissPush = () => {
+    localStorage.setItem('cg_push_dismissed', '1');
+    setShowPushPrompt(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -96,7 +128,36 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5 pb-24">{children}</main>
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5 pb-24">
+        {showPushPrompt && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-white border border-amber-200/80 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <BellRing className="w-5 h-5 text-[#E85D3F] shrink-0" />
+              <p className="text-xs text-slate-700">
+                <strong className="text-slate-900">Get mobile alerts</strong> when someone invites
+                you or joins your activity.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleEnablePush}
+                disabled={enablingPush}
+                className="px-3 py-1.5 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold disabled:opacity-60"
+              >
+                {enablingPush ? 'Enabling...' : 'Enable'}
+              </button>
+              <button
+                onClick={dismissPush}
+                className="p-1 text-slate-400 hover:text-slate-600"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+        {children}
+      </main>
 
       <div className="pb-16">
         <Footer />

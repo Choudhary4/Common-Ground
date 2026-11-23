@@ -9,12 +9,14 @@ import {
   Notification,
   Report,
   AnalyticsEvent,
+  PushSubscription,
 } from '../models/index.js';
 import { env } from '../config/env.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope, requireRole } from '../middleware/rbac.js';
 import { actionRateLimiter } from '../middleware/rateLimit.js';
 import { emitToHostel, emitToUser } from '../services/socketService.js';
+import { sendPushToUser } from '../services/pushService.js';
 
 const router = Router();
 
@@ -240,6 +242,11 @@ router.post('/invite', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), actionRateLim
     });
 
     emitToUser(targetUser._id.toString(), 'notification:new', notification);
+    void sendPushToUser(targetUser._id, {
+      title: notification.title,
+      body: notification.message,
+      url: `/app/activities/${activity._id}`,
+    });
     res.status(201).json({ message: 'Invitation sent', notification });
   } catch (err) {
     next(err);
@@ -401,6 +408,47 @@ router.post('/reports', actionRateLimiter, async (req, res, next) => {
     });
 
     res.status(201).json({ message: 'Report submitted to hostel manager', reportId: report._id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/push/vapid-public-key', (_req, res) => {
+  res.json({ publicKey: env.VAPID_PUBLIC_KEY ?? null });
+});
+
+const pushSubscribeSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});
+
+router.post('/push/subscribe', async (req, res, next) => {
+  try {
+    const sub = pushSubscribeSchema.parse(req.body);
+    await PushSubscription.findOneAndUpdate(
+      { endpoint: sub.endpoint },
+      {
+        userId: req.auth!.userId,
+        hostelId: req.auth!.hostelId!,
+        endpoint: sub.endpoint,
+        keys: sub.keys,
+      },
+      { upsert: true, new: true }
+    );
+    res.status(201).json({ subscribed: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/push/unsubscribe', async (req, res, next) => {
+  try {
+    const { endpoint } = z.object({ endpoint: z.string().min(1) }).parse(req.body);
+    await PushSubscription.deleteOne({ endpoint, userId: req.auth!.userId });
+    res.json({ subscribed: false });
   } catch (err) {
     next(err);
   }

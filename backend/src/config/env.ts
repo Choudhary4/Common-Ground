@@ -12,6 +12,9 @@ const envSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().positive().default(72),
   SOCIAL_STATUS_TTL_MINUTES: z.coerce.number().positive().default(120),
   QR_BASE_URL: z.string().url().default('http://localhost:5173/join'),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:hello@commonground.local'),
 });
 
 const parsed = envSchema.safeParse(process.env);

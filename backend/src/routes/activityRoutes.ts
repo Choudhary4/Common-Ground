@@ -12,6 +12,7 @@ import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope, requireRole } from '../middleware/rbac.js';
 import { actionRateLimiter } from '../middleware/rateLimit.js';
 import { emitToHostel, emitToUser } from '../services/socketService.js';
+import { sendPushToUser } from '../services/pushService.js';
 
 const router = Router();
 router.use(authenticate, requireHostelScope);
@@ -402,6 +403,11 @@ router.post('/:id/join', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), async (req,
           referenceId: activity._id,
         });
         emitToUser(activity.creatorId.toString(), 'notification:new', notif);
+        void sendPushToUser(activity.creatorId, {
+          title: notif.title,
+          body: notif.message,
+          url: `/app/activities/${activity._id}`,
+        });
       }
 
       await AnalyticsEvent.create({
@@ -454,6 +460,11 @@ router.post('/:id/join', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), async (req,
       activityId: activity._id,
       requestId: joinRequest._id,
       notification: notif,
+    });
+    void sendPushToUser(activity.creatorId, {
+      title: notif.title,
+      body: notif.message,
+      url: `/app/activities/${activity._id}`,
     });
 
     res.status(201).json({
@@ -515,6 +526,11 @@ router.post(
         emitToUser(joinRequest.requesterId.toString(), 'join_request:declined', {
           activityId: activity._id,
           notification: notif,
+        });
+        void sendPushToUser(joinRequest.requesterId, {
+          title: notif.title,
+          body: notif.message,
+          url: `/app/activities/${activity._id}`,
         });
 
         res.json({ status: 'DECLINED' });
@@ -587,6 +603,11 @@ router.post(
         activityId: activity._id,
         notification: notif,
       });
+      void sendPushToUser(joinRequest.requesterId, {
+        title: notif.title,
+        body: notif.message,
+        url: `/app/activities/${activity._id}`,
+      });
       emitToHostel(hostelId.toString(), 'participant:joined', {
         activityId: activity._id,
         confirmedCount: updated.confirmedCount,
@@ -657,6 +678,11 @@ router.post('/:id/leave', async (req, res, next) => {
           referenceId: activity._id,
         });
         emitToUser(nextHost.userId.toString(), 'notification:new', notif);
+        void sendPushToUser(nextHost.userId, {
+          title: notif.title,
+          body: notif.message,
+          url: `/app/activities/${activity._id}`,
+        });
       } else {
         activity.confirmedCount = 0;
         activity.status = 'CANCELLED';
@@ -731,6 +757,13 @@ router.post('/:id/cancel', requireRole('TRAVELLER', 'HOSTEL_MANAGER'), async (re
           referenceId: activity._id,
         }))
       );
+      for (const p of participants) {
+        void sendPushToUser(p.userId, {
+          title: `Cancelled: ${activity.title}`,
+          body: `"${activity.title}" has been cancelled.`,
+          url: `/app/activities/${activity._id}`,
+        });
+      }
     }
 
     emitToHostel(hostelId.toString(), 'activity:cancelled', { activityId: activity._id });

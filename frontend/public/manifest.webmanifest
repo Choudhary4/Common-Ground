@@ -1,0 +1,17 @@
+{
+  "name": "Common Ground — goSTOPS",
+  "short_name": "Common Ground",
+  "description": "Connect with fellow solo travellers at your goSTOPS hostel.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#E85D3F",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
