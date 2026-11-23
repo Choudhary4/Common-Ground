@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Broadcast } from '@phosphor-icons/react';
 import { AuthProvider, useAuth, type UserRole } from './context/AuthContext';
 import { LandingPage } from './pages/LandingPage';
 import { JoinPage } from './pages/JoinPage';
@@ -28,8 +29,31 @@ function ProtectedRoute({
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF7F2] text-sm text-slate-500">
-        Loading...
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#f9f9ff] px-6 text-center select-none">
+        <div className="relative flex items-center justify-center mb-6">
+          <span className="absolute w-24 h-24 rounded-full bg-emerald-400/20 animate-ping" />
+          <span className="absolute w-20 h-20 rounded-full bg-[#14241E]/10 animate-pulse" />
+          <div className="relative w-16 h-16 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center shadow-lg border border-emerald-400/25">
+            <Broadcast weight="duotone" className="w-8 h-8" />
+          </div>
+        </div>
+
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#14241E] text-white text-[11px] font-extrabold tracking-wider uppercase shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>GOSTOPS</span>
+          <span className="text-emerald-400">×</span>
+          <span>COMMON GROUND</span>
+        </div>
+
+        <p className="mt-3 text-xs font-semibold text-[#59413c]">
+          Tuning into your hostel radar...
+        </p>
+
+        <div className="mt-5 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#a93017] animate-bounce [animation-delay:-0.3s]" />
+          <span className="w-2 h-2 rounded-full bg-[#a93017]/80 animate-bounce [animation-delay:-0.15s]" />
+          <span className="w-2 h-2 rounded-full bg-[#14241E] animate-bounce" />
+        </div>
       </div>
     );
   }
