@@ -12,8 +12,9 @@ router.use(authenticate, requireRole('CENTRAL_ADMIN'));
 
 router.get('/overview', async (_req, res, next) => {
   try {
-    const [hostelCount, managerCount, staffCount, realTravellers, realActivities, events] =
+    const [hostels, hostelCount, managerCount, staffCount, realTravellers, realActivities, events, perHostelEvents, perHostelTravellers] =
       await Promise.all([
+        Hostel.find().select('_id name city isDemo').lean(),
         Hostel.countDocuments({ status: 'ACTIVE' }),
         User.countDocuments({ role: 'HOSTEL_MANAGER', status: 'ACTIVE' }),
         User.countDocuments({ role: 'HOSTEL_STAFF', status: 'ACTIVE' }),
@@ -23,10 +24,42 @@ router.get('/overview', async (_req, res, next) => {
           { $match: { isDemo: false } },
           { $group: { _id: '$eventType', count: { $sum: 1 } } },
         ]),
+        AnalyticsEvent.aggregate([
+          { $match: { isDemo: false } },
+          { $group: { _id: { hostelId: '$hostelId', eventType: '$eventType' }, count: { $sum: 1 } } },
+        ]),
+        User.aggregate([
+          { $match: { role: 'TRAVELLER', isDemo: false, hostelId: { $ne: null } } },
+          { $group: { _id: '$hostelId', count: { $sum: 1 } } },
+        ]),
       ]);
 
     const eventCounts: Record<string, number> = {};
     for (const e of events) eventCounts[e._id] = e.count;
+
+    const travellerMap = new Map(perHostelTravellers.map((t) => [t._id.toString(), t.count as number]));
+    const hostelEventMap = new Map<string, Record<string, number>>();
+    for (const item of perHostelEvents) {
+      const hId = item._id.hostelId?.toString();
+      if (!hId) continue;
+      if (!hostelEventMap.has(hId)) hostelEventMap.set(hId, {});
+      hostelEventMap.get(hId)![item._id.eventType] = item.count;
+    }
+
+    const hostelBreakdown = hostels.map((h) => {
+      const ev = hostelEventMap.get(h._id.toString()) ?? {};
+      return {
+        hostelId: h._id,
+        name: h.name,
+        city: h.city,
+        isDemo: h.isDemo,
+        qrScans: ev.QR_SCAN ?? 0,
+        travellersOnboarded: travellerMap.get(h._id.toString()) ?? 0,
+        activitiesCreated: ev.ACTIVITY_CREATED ?? 0,
+        activitiesJoined: ev.ACTIVITY_JOINED ?? 0,
+        activitiesCompleted: ev.ACTIVITY_COMPLETED ?? 0,
+      };
+    });
 
     res.json({
       activeHostels: hostelCount,
@@ -39,6 +72,7 @@ router.get('/overview', async (_req, res, next) => {
         activitiesJoined: eventCounts.ACTIVITY_JOINED ?? 0,
         activitiesCompleted: eventCounts.ACTIVITY_COMPLETED ?? 0,
       },
+      hostelBreakdown,
     });
   } catch (err) {
     next(err);

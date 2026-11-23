@@ -3,6 +3,18 @@ import { Building2, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react';
 import { StaffLayout } from '../components/StaffLayout';
 import { apiRequest, ApiError } from '../lib/api';
 
+interface HostelMetricRow {
+  hostelId: string;
+  name: string;
+  city: string;
+  isDemo: boolean;
+  qrScans: number;
+  travellersOnboarded: number;
+  activitiesCreated: number;
+  activitiesJoined: number;
+  activitiesCompleted: number;
+}
+
 interface AdminOverview {
   activeHostels: number;
   managers: number;
@@ -10,8 +22,11 @@ interface AdminOverview {
   realMetrics: {
     travellersOnboarded: number;
     activitiesCreated: number;
+    qrScans: number;
     activitiesJoined: number;
+    activitiesCompleted: number;
   };
+  hostelBreakdown: HostelMetricRow[];
 }
 
 interface HostelRow {
@@ -119,32 +134,74 @@ export function AdminDashboardPage() {
   return (
     <StaffLayout title="Central Admin" subtitle="Platform Properties, Managers & Staff">
       <div className="space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Active Hostels</p>
+            <p className="text-xs text-slate-500">QR Scans (Real)</p>
             <p className="text-2xl font-extrabold text-slate-900 mt-1">
-              {overview?.activeHostels ?? '—'}
+              {overview?.realMetrics.qrScans ?? '—'}
             </p>
           </div>
           <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Managers / Staff</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">
-              {overview ? `${overview.managers} / ${overview.staff}` : '—'}
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Real Travellers</p>
+            <p className="text-xs text-slate-500">Travellers Joined</p>
             <p className="text-2xl font-extrabold text-emerald-700 mt-1">
               {overview?.realMetrics.travellersOnboarded ?? '—'}
             </p>
           </div>
           <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Real Activity Joins</p>
+            <p className="text-xs text-slate-500">Activities Created</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-1">
+              {overview?.realMetrics.activitiesCreated ?? '—'}
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
+            <p className="text-xs text-slate-500">Activity Joins</p>
             <p className="text-2xl font-extrabold text-emerald-700 mt-1">
               {overview?.realMetrics.activitiesJoined ?? '—'}
             </p>
           </div>
+          <div className="bg-white rounded-2xl border border-amber-200/80 p-4 col-span-2 sm:col-span-1">
+            <p className="text-xs text-slate-500">Active Hostels</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-1">
+              {overview?.activeHostels ?? '—'}
+            </p>
+          </div>
         </div>
+
+        {overview?.hostelBreakdown && overview.hostelBreakdown.length > 0 && (
+          <div className="bg-white rounded-2xl border border-amber-200/80 p-5 overflow-x-auto">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">
+              Hostel-wise Real Adoption (Excludes Demo Data)
+            </h3>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-2 pr-4 font-semibold">Hostel</th>
+                  <th className="py-2 px-3 font-semibold">QR Scans</th>
+                  <th className="py-2 px-3 font-semibold">Travellers</th>
+                  <th className="py-2 px-3 font-semibold">Activities</th>
+                  <th className="py-2 px-3 font-semibold">Joins</th>
+                  <th className="py-2 pl-3 font-semibold">Completed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {overview.hostelBreakdown.map((row) => (
+                  <tr key={row.hostelId}>
+                    <td className="py-2.5 pr-4 font-semibold text-slate-900">
+                      {row.name} <span className="font-normal text-slate-500">· {row.city}</span>
+                    </td>
+                    <td className="py-2.5 px-3">{row.qrScans}</td>
+                    <td className="py-2.5 px-3 font-semibold text-emerald-700">
+                      {row.travellersOnboarded}
+                    </td>
+                    <td className="py-2.5 px-3">{row.activitiesCreated}</td>
+                    <td className="py-2.5 px-3">{row.activitiesJoined}</td>
+                    <td className="py-2.5 pl-3">{row.activitiesCompleted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {msg && (
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
