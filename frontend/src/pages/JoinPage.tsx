@@ -17,7 +17,7 @@ export function JoinPage() {
   const [searchParams] = useSearchParams();
   const codeFromQr = searchParams.get('code')?.trim().toUpperCase() ?? '';
   const navigate = useNavigate();
-  const { refreshAuth } = useAuth();
+  const { user, loading: authLoading, refreshAuth } = useAuth();
 
   const [hostel, setHostel] = useState<HostelInfo | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -53,6 +53,12 @@ export function JoinPage() {
       active = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!authLoading && user && hostel && user.role === 'TRAVELLER' && user.hostelId === hostel.id) {
+      navigate('/app', { replace: true });
+    }
+  }, [authLoading, user, hostel, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
