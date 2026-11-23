@@ -16,11 +16,18 @@ import adminRoutes from './routes/adminRoutes.js';
 export function createApp() {
   const app = express();
 
+  const allowedOrigins = env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/+$/, ''));
+
   app.set('trust proxy', 1);
   app.use(helmet());
   app.use(
     cors({
-      origin: env.FRONTEND_URL,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const clean = origin.replace(/\/+$/, '');
+        if (allowedOrigins.includes(clean)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+      },
       credentials: true,
     })
   );

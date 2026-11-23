@@ -22,9 +22,10 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
 }
 
 export function initSocketIO(httpServer: HttpServer): SocketIOServer {
+  const allowedOrigins = env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/+$/, ''));
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: env.FRONTEND_URL,
+      origin: allowedOrigins,
       credentials: true,
     },
   });

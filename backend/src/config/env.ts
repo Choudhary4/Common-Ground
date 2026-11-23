@@ -7,7 +7,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   MONGODB_URI: z.string().min(1).default('mongodb://localhost:27017/common-ground'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().min(1).default('http://localhost:5173'),
   COOKIE_SECRET: z.string().min(16).default('dev-cookie-secret-change-in-production'),
   SESSION_TTL_HOURS: z.coerce.number().positive().default(72),
   SOCIAL_STATUS_TTL_MINUTES: z.coerce.number().positive().default(120),
