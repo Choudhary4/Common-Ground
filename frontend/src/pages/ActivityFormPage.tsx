@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles, Globe, Lock, Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest, ApiError } from '../lib/api';
 
@@ -65,6 +65,7 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [meetingPoint, setMeetingPoint] = useState('Common Room');
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [joinMode, setJoinMode] = useState<'PUBLIC' | 'APPROVAL'>('PUBLIC');
+  const [selectedTpl, setSelectedTpl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -143,204 +144,251 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   return (
     <TravellerLayout>
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#e0bfb8]/40 text-xs font-bold text-[#59413c] hover:text-[#111c2d] shadow-2xs transition"
         >
-          <ArrowLeft className="w-4 h-4" /> Back
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
         </button>
 
-        <div className="bg-white rounded-2xl border border-amber-200/80 p-5 sm:p-6">
-          <h1 className="text-xl font-extrabold text-slate-900 mb-1">
-            {mode === 'edit' ? 'Edit Activity' : 'Create an Activity'}
-          </h1>
-          <p className="text-xs text-slate-500 mb-4">
-            Keep it simple and welcoming—anyone at your hostel can see it.
-          </p>
+        <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 shadow-sm overflow-hidden relative">
+          <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-[#a93017]" />
 
-          {mode === 'create' && (
-            <div className="mb-5">
-              <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 mb-2">
-                <Sparkles className="w-3 h-3 text-[#E85D3F]" /> Quick 1-tap ideas
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {QUICK_TEMPLATES.map((tpl) => (
-                  <button
-                    key={tpl.label}
-                    type="button"
-                    onClick={() => {
-                      setTitle(tpl.title);
-                      setDescription(tpl.description);
-                      setCategory(tpl.category);
-                      setMeetingPoint(tpl.meetingPoint);
-                      setMaxParticipants(tpl.maxParticipants);
-                    }}
-                    className="px-3 py-1.5 rounded-full bg-[#FAF7F2] hover:bg-[#FFF0EC] border border-amber-200/80 hover:border-[#E85D3F]/40 text-xs font-semibold text-slate-700 transition active:scale-95"
-                  >
-                    {tpl.label}
-                  </button>
-                ))}
+          <div className="p-5">
+            <h1 className="text-[22px] font-extrabold text-[#111c2d] leading-tight">
+              {mode === 'edit' ? 'Edit Activity' : 'Host a Hostel Plan'}
+            </h1>
+            <p className="text-xs text-[#59413c] mt-1 mb-4">
+              Keep it casual—anyone staying at your hostel can see and join.
+            </p>
+
+            {mode === 'create' && (
+              <div className="mb-5">
+                <p className="text-[11px] font-bold text-[#59413c] flex items-center gap-1 mb-2 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-[#a93017]" /> 1-Tap Quick Ideas
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {QUICK_TEMPLATES.map((tpl) => {
+                    const active = selectedTpl === tpl.label;
+                    return (
+                      <button
+                        key={tpl.label}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTpl(tpl.label);
+                          setTitle(tpl.title);
+                          setDescription(tpl.description);
+                          setCategory(tpl.category);
+                          setMeetingPoint(tpl.meetingPoint);
+                          setMaxParticipants(tpl.maxParticipants);
+                        }}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold text-left transition active:scale-[0.98] border ${
+                          active
+                            ? 'bg-[#14241E] text-white border-[#14241E] shadow-xs'
+                            : 'bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] border-[#e0bfb8]/25'
+                        }`}
+                      >
+                        {tpl.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {error && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Activity Name
-              </label>
-              <input
-                type="text"
-                required
-                minLength={3}
-                maxLength={100}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Chai & UNO Night"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
-              <textarea
-                required
-                minLength={5}
-                maxLength={600}
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What's the plan? Beginners welcome!"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white"
-                >
-                  <option value="SOCIAL">Social</option>
-                  <option value="GAMES">Games</option>
-                  <option value="EXPLORATION">Exploration</option>
-                  <option value="FOOD">Food</option>
-                  <option value="OTHER">Other</option>
-                </select>
+            {error && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                {error}
               </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Max Participants
+                <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
+                  Activity Name
                 </label>
                 <input
-                  type="number"
-                  min={2}
-                  max={50}
+                  type="text"
                   required
-                  value={maxParticipants}
-                  onChange={(e) => setMaxParticipants(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm"
+                  minLength={3}
+                  maxLength={100}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., Rooftop Chai & UNO Night"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
-                <input
-                  type="date"
+                <label className="block text-xs font-bold text-[#111c2d] mb-1.5">Description</label>
+                <textarea
                   required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  minLength={5}
+                  maxLength={600}
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What's the plan? Beginners totally welcome!"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#111c2d] mb-1.5">Category</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
+                  >
+                    <option value="SOCIAL">Social</option>
+                    <option value="GAMES">Games</option>
+                    <option value="EXPLORATION">Exploration</option>
+                    <option value="FOOD">Food</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-[#a93017]" /> Max Spots
+                  </label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={50}
+                    required
+                    value={maxParticipants}
+                    onChange={(e) => setMaxParticipants(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
+                  />
+                </div>
+              </div>
+
+              {/* Date on full row + Start/End in 2-col row so nothing clips on mobile */}
+              <div className="p-3.5 rounded-2xl bg-[#f0f3ff] border border-[#e0bfb8]/25 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-700" /> Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0bfb8]/40 text-sm text-[#111c2d] focus:outline-none focus:border-[#a93017]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-emerald-700" /> Start Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0bfb8]/40 text-sm text-[#111c2d] focus:outline-none focus:border-[#a93017]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-700" /> End Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0bfb8]/40 text-sm text-[#111c2d] focus:outline-none focus:border-[#a93017]"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Start</label>
+                <label className="block text-xs font-bold text-[#111c2d] mb-1.5 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-[#a93017]" /> Meeting Point
+                </label>
                 <input
-                  type="time"
+                  type="text"
                   required
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  value={meetingPoint}
+                  onChange={(e) => setMeetingPoint(e.target.value)}
+                  placeholder="e.g., Rooftop Common Room"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">End</label>
-                <input
-                  type="time"
-                  required
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                />
+                <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
+                  Joining Permission
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setJoinMode('PUBLIC')}
+                    className={`p-3 rounded-xl border text-left transition ${
+                      joinMode === 'PUBLIC'
+                        ? 'border-[#14241E] bg-[#14241E] text-white shadow-xs'
+                        : 'border-[#e0bfb8]/40 bg-[#f9f9ff] text-[#111c2d]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Globe
+                        className={`w-3.5 h-3.5 ${
+                          joinMode === 'PUBLIC' ? 'text-emerald-400' : 'text-slate-400'
+                        }`}
+                      />
+                      <p className="text-xs font-bold">Public</p>
+                    </div>
+                    <p
+                      className={`text-[10px] leading-tight ${
+                        joinMode === 'PUBLIC' ? 'text-emerald-100/80' : 'text-[#59413c]'
+                      }`}
+                    >
+                      Instant join for hostel guests
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setJoinMode('APPROVAL')}
+                    className={`p-3 rounded-xl border text-left transition ${
+                      joinMode === 'APPROVAL'
+                        ? 'border-[#14241E] bg-[#14241E] text-white shadow-xs'
+                        : 'border-[#e0bfb8]/40 bg-[#f9f9ff] text-[#111c2d]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Lock
+                        className={`w-3.5 h-3.5 ${
+                          joinMode === 'APPROVAL' ? 'text-amber-400' : 'text-slate-400'
+                        }`}
+                      />
+                      <p className="text-xs font-bold">Approval</p>
+                    </div>
+                    <p
+                      className={`text-[10px] leading-tight ${
+                        joinMode === 'APPROVAL' ? 'text-emerald-100/80' : 'text-[#59413c]'
+                      }`}
+                    >
+                      You approve each request
+                    </p>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Meeting Point
-              </label>
-              <input
-                type="text"
-                required
-                value={meetingPoint}
-                onChange={(e) => setMeetingPoint(e.target.value)}
-                placeholder="e.g., Rooftop Common Room"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Joining Permission
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setJoinMode('PUBLIC')}
-                  className={`p-3 rounded-xl border text-left transition ${
-                    joinMode === 'PUBLIC'
-                      ? 'border-[#E85D3F] bg-[#FFF4F1]'
-                      : 'border-slate-200'
-                  }`}
-                >
-                  <p className="text-xs font-bold text-slate-900">Public (Instant)</p>
-                  <p className="text-[11px] text-slate-500">Anyone at the hostel can join</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setJoinMode('APPROVAL')}
-                  className={`p-3 rounded-xl border text-left transition ${
-                    joinMode === 'APPROVAL'
-                      ? 'border-[#E85D3F] bg-[#FFF4F1]'
-                      : 'border-slate-200'
-                  }`}
-                >
-                  <p className="text-xs font-bold text-slate-900">Approval Required</p>
-                  <p className="text-[11px] text-slate-500">You approve join requests</p>
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full py-3 rounded-xl bg-[#E85D3F] hover:bg-[#D94E32] text-white font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Publish Activity'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full h-12 rounded-full bg-[#a93017] hover:bg-[#cb482c] active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-60"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Publishing...' : mode === 'edit' ? 'Save Changes' : 'Publish Activity'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </TravellerLayout>
