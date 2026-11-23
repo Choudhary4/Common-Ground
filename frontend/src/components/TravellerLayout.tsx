@@ -159,12 +159,12 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <div className="pb-16">
+      <div className="pb-20">
         <Footer />
       </div>
 
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-amber-200/80">
-        <div className="max-w-2xl mx-auto grid grid-cols-4 h-16">
+      <nav className="fixed bottom-3 inset-x-0 z-30 px-4 pointer-events-none">
+        <div className="pointer-events-auto max-w-md mx-auto grid grid-cols-4 h-14 rounded-full bg-white/90 backdrop-blur-md border border-amber-200/80 shadow-lg px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to;
@@ -172,11 +172,11 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center justify-center gap-1 text-xs font-medium transition ${
+                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold rounded-full transition ${
                   active ? 'text-[#E85D3F]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5]' : ''}`} />
+                <Icon className={`w-4 h-4 ${active ? 'stroke-[2.5]' : ''}`} />
                 <span>{item.label}</span>
               </Link>
             );

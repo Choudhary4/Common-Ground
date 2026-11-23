@@ -4,6 +4,7 @@ import { Plus, Loader2 } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { SocialStatusWidget, type SocialStatusValue } from '../components/SocialStatusWidget';
 import { ActivityCard, type ActivitySummary } from '../components/ActivityCard';
+import { CommonRoomRadar, type RadarTraveller } from '../components/CommonRoomRadar';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,7 @@ export function TravellerDashboard() {
     null
   );
   const [openCount, setOpenCount] = useState(0);
+  const [radarTravellers, setRadarTravellers] = useState<RadarTraveller[]>([]);
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
   const [filter, setFilter] = useState('all');
   const [category, setCategory] = useState('ALL');
@@ -39,13 +41,14 @@ export function TravellerDashboard() {
         apiRequest<{ status: { status: SocialStatusValue; expiresAt: string } | null }>(
           '/traveller/status'
         ),
-        apiRequest<{ openCount: number }>('/traveller/discover'),
+        apiRequest<{ openCount: number; travellers: RadarTraveller[] }>('/traveller/discover'),
         apiRequest<{ activities: ActivitySummary[] }>(
           `/activities?filter=${filter}&category=${category}`
         ),
       ]);
       setStatusDoc(statusRes.status);
       setOpenCount(discoverRes.openCount);
+      setRadarTravellers(discoverRes.travellers);
       setActivities(actRes.activities);
     } finally {
       setLoading(false);
@@ -95,6 +98,11 @@ export function TravellerDashboard() {
             <Plus className="w-4 h-4" /> Create Activity
           </Link>
         </div>
+
+        <CommonRoomRadar
+          hostelName={user?.hostelName ?? 'Your Hostel'}
+          travellers={radarTravellers}
+        />
 
         <SocialStatusWidget
           currentStatus={statusDoc?.status ?? null}
