@@ -12,6 +12,10 @@ import {
   UserPlus,
   UserMinus,
   SignOut,
+  Sparkle,
+  CalendarBlank,
+  MapPin,
+  Prohibit,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { Avatar } from '../components/Avatar';
@@ -53,6 +57,29 @@ interface HostelTraveller {
   avatar: string | null;
 }
 
+interface TravellerProfile {
+  userId: string;
+  nickname: string;
+  avatar: string | null;
+  interests: string[];
+  socialStatus: string | null;
+  joinedAt: string;
+  hostedActivities: Array<{
+    _id: string;
+    title: string;
+    category: string;
+    startTime: string;
+    meetingPoint: string;
+  }>;
+}
+
+const VIBE_LABELS: Record<string, string> = {
+  OPEN_TO_MEETING: 'Open to meeting',
+  UP_FOR_ACTIVITIES: 'Up for activities',
+  LOOKING_FOR_COMPANY: 'Looking for company',
+  JUST_CHILLING: 'Just chilling',
+};
+
 export function ChatPage() {
   const { roomId } = useParams<{ roomId?: string }>();
   const navigate = useNavigate();
@@ -77,6 +104,13 @@ export function ChatPage() {
   // Group members modal
   const [membersModalOpen, setMembersModalOpen] = useState(false);
   const [memberActionId, setMemberActionId] = useState<string | null>(null);
+
+  // Traveller profile modal (in-chat)
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileData, setProfileData] = useState<TravellerProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -271,57 +305,121 @@ export function ChatPage() {
     }
   };
 
-  const activeRoom = rooms.find((r) => r._id === roomId);
+  const openProfile = async (targetUserId: string) => {
+    if (!targetUserId || targetUserId === user?.id) return;
+    setProfileOpen(true);
+    setLoadingProfile(true);
+    setProfileData(null);
+    setConfirmBlock(false);
+    try {
+      const res = await apiRequest<{ profile: TravellerProfile }>(
+        `/traveller/profile/${targetUserId}`
+      );
+      setProfileData(res.profile);
+    } catch {
+      setProfileData(null);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
-  // Conversation Thread View
+  const startDirectChat = async (targetUserId: string) => {
+    setProfileBusy(true);
+    try {
+      const res = await apiRequest<{ roomId: string }>('/chat/rooms/direct', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      });
+      setProfileOpen(false);
+      setMembersModalOpen(false);
+      await loadRooms();
+      navigate(`/app/chat/${res.roomId}`);
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
+  const blockFromProfile = async (targetUserId: string) => {
+    setProfileBusy(true);
+    try {
+      await apiRequest(`/traveller/block/${targetUserId}`, { method: 'POST' });
+      setProfileOpen(false);
+      setConfirmBlock(false);
+      await loadRooms();
+      navigate('/app/chat');
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
+  const activeRoom = rooms.find((r) => r._id === roomId);
+  const directOtherMember =
+    activeRoom?.type === 'DIRECT'
+      ? activeRoom.members.find((m) => m.userId !== user?.id) ?? null
+      : null;
+
+  // Conversation Thread View (Instagram-style fixed viewport; only messages scroll inside)
   if (roomId) {
     return (
-      <TravellerLayout>
-        <div className="flex flex-col h-[calc(100vh-11.5rem)] bg-white rounded-2xl border border-[#e0bfb8]/35 shadow-sm overflow-hidden">
-          {/* Thread Header */}
-          <div className="px-4 py-3 border-b border-[#e0bfb8]/30 bg-[#f9f9ff] flex items-center gap-3">
+      <div className="fixed inset-0 h-[100dvh] z-40 bg-[#f9f9ff] flex justify-center overflow-hidden">
+        <div className="w-full max-w-2xl h-full sm:my-3 sm:h-[calc(100dvh-1.5rem)] flex flex-col bg-white sm:rounded-2xl sm:border sm:border-[#e0bfb8]/35 sm:shadow-sm overflow-hidden">
+          {/* Pinned Thread Header */}
+          <div className="shrink-0 px-4 py-3 border-b border-[#e0bfb8]/30 bg-[#f9f9ff] flex items-center gap-3">
             <button
               onClick={() => navigate('/app/chat')}
-              className="p-1.5 rounded-full hover:bg-[#f0f3ff] text-[#111c2d]"
+              className="p-1.5 rounded-full hover:bg-[#f0f3ff] text-[#111c2d] shrink-0"
               aria-label="Back to chats"
             >
               <ArrowLeft weight="bold" className="w-4 h-4" />
             </button>
             {activeRoom?.type === 'GROUP' ? (
-              <div className="w-9 h-9 rounded-xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
-                <UsersThree weight="duotone" className="w-5 h-5" />
-              </div>
+              <>
+                <div className="w-9 h-9 rounded-xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
+                  <UsersThree weight="duotone" className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
+                    {activeRoom.name}
+                  </h2>
+                  <p className="text-[11px] text-[#59413c] truncate">
+                    {activeRoom.members.map((m) => m.nickname).join(', ')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openMembersModal}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] text-[11px] font-bold shrink-0"
+                >
+                  <UsersThree weight="duotone" className="w-3.5 h-3.5" />
+                  Members ({activeRoom.members.length})
+                </button>
+              </>
             ) : (
-              <Avatar
-                src={activeRoom?.avatar}
-                name={activeRoom?.name ?? 'Chat'}
-                className="w-9 h-9 rounded-xl"
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
-                {activeRoom?.name ?? 'Hostel Chat'}
-              </h2>
-              {activeRoom?.type === 'GROUP' && (
-                <p className="text-[11px] text-[#59413c] truncate">
-                  {activeRoom.members.map((m) => m.nickname).join(', ')}
-                </p>
-              )}
-            </div>
-            {activeRoom?.type === 'GROUP' && (
               <button
                 type="button"
-                onClick={openMembersModal}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] text-[11px] font-bold shrink-0"
+                onClick={() => directOtherMember && openProfile(directOtherMember.userId)}
+                disabled={!directOtherMember}
+                className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-xl py-0.5 pr-2 hover:bg-[#f0f3ff]/80 transition disabled:hover:bg-transparent"
               >
-                <UsersThree weight="duotone" className="w-3.5 h-3.5" />
-                Members ({activeRoom.members.length})
+                <Avatar
+                  src={activeRoom?.avatar}
+                  name={activeRoom?.name ?? 'Chat'}
+                  className="w-9 h-9 rounded-xl shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
+                    {activeRoom?.name ?? 'Hostel Chat'}
+                  </h2>
+                  <p className="text-[11px] text-[#59413c] truncate">
+                    Tap to view profile
+                  </p>
+                </div>
               </button>
             )}
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f9f9ff]/60">
+          {/* Messages (scrolls ONLY inside this box) */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 bg-[#f9f9ff]/60">
             {loadingMsgs ? (
               <div className="py-10 flex justify-center text-slate-400">
                 <CircleNotch className="w-5 h-5 animate-spin" />
@@ -343,11 +441,18 @@ export function ChatPage() {
                     className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}
                   >
                     {!mine && (
-                      <Avatar
-                        src={m.senderAvatar}
-                        name={m.senderNickname}
-                        className="w-7 h-7 rounded-full"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => openProfile(m.senderId)}
+                        className="shrink-0 rounded-full hover:opacity-85 active:scale-95 transition"
+                        aria-label={`View ${m.senderNickname}'s profile`}
+                      >
+                        <Avatar
+                          src={m.senderAvatar}
+                          name={m.senderNickname}
+                          className="w-7 h-7 rounded-full"
+                        />
+                      </button>
                     )}
                     <div
                       className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${
@@ -357,9 +462,13 @@ export function ChatPage() {
                       }`}
                     >
                       {!mine && activeRoom?.type === 'GROUP' && (
-                        <p className="text-[10px] font-bold text-[#a93017] mb-0.5">
+                        <button
+                          type="button"
+                          onClick={() => openProfile(m.senderId)}
+                          className="block text-[10px] font-bold text-[#a93017] hover:underline mb-0.5 text-left"
+                        >
                           {m.senderNickname}
-                        </p>
+                        </button>
                       )}
                       <p className="break-words">{m.text}</p>
                       <div
@@ -390,10 +499,10 @@ export function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Bar */}
+          {/* Pinned Input Bar */}
           <form
             onSubmit={handleSend}
-            className="p-3 border-t border-[#e0bfb8]/30 bg-white flex items-center gap-2"
+            className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-[#e0bfb8]/30 bg-white flex items-center gap-2"
           >
             <input
               type="text"
@@ -445,17 +554,22 @@ export function ChatPage() {
                       key={m.userId}
                       className="flex items-center justify-between p-2.5 rounded-xl bg-[#f0f3ff] text-xs"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Avatar src={m.avatar} name={m.nickname} className="w-7 h-7 rounded-full" />
+                      <button
+                        type="button"
+                        onClick={() => !isMe && openProfile(m.userId)}
+                        disabled={isMe}
+                        className="flex items-center gap-2 min-w-0 text-left hover:opacity-85 disabled:hover:opacity-100"
+                      >
+                        <Avatar src={m.avatar} name={m.nickname} className="w-7 h-7 rounded-full shrink-0" />
                         <span className="font-bold text-[#111c2d] truncate">
                           {m.nickname} {isMe ? '(You)' : ''}
                         </span>
                         {isMemberCreator && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-[#14241E] text-emerald-300 text-[9px] font-bold">
+                          <span className="px-1.5 py-0.5 rounded-full bg-[#14241E] text-emerald-300 text-[9px] font-bold shrink-0">
                             Admin
                           </span>
                         )}
-                      </div>
+                      </button>
                       {isCreator && !isMe && (
                         <button
                           type="button"
@@ -531,7 +645,181 @@ export function ChatPage() {
             </div>
           </div>
         )}
-      </TravellerLayout>
+
+        {/* Traveller Profile Modal */}
+        {profileOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setProfileOpen(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35 max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-[#111c2d] text-base">
+                  Traveller Profile
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(false)}
+                  className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+                >
+                  <X weight="bold" className="w-4 h-4" />
+                </button>
+              </div>
+
+              {loadingProfile ? (
+                <div className="py-10 flex justify-center text-slate-400">
+                  <CircleNotch className="w-6 h-6 animate-spin" />
+                </div>
+              ) : !profileData ? (
+                <p className="text-xs text-[#59413c] text-center py-6">
+                  Could not load profile right now.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Avatar & Vibe */}
+                  <div className="flex flex-col items-center text-center gap-2">
+                    <Avatar
+                      src={profileData.avatar}
+                      name={profileData.nickname}
+                      className="w-20 h-20 rounded-2xl shadow-sm"
+                    />
+                    <div>
+                      <h4 className="text-lg font-extrabold text-[#111c2d]">
+                        {profileData.nickname}
+                      </h4>
+                      {profileData.socialStatus ? (
+                        <span className="mt-1 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#14241E] text-emerald-300 text-[11px] font-bold">
+                          <Sparkle weight="fill" className="w-3 h-3" />
+                          {VIBE_LABELS[profileData.socialStatus] ?? profileData.socialStatus}
+                        </span>
+                      ) : (
+                        <span className="mt-1 inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-semibold">
+                          Staying at your hostel
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Interests */}
+                  {profileData.interests.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-[#59413c] uppercase tracking-wider">
+                        Interests
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {profileData.interests.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2.5 py-1 rounded-full bg-[#f0f3ff] text-[#111c2d] text-xs font-semibold"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upcoming Hosted Activities */}
+                  {profileData.hostedActivities.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-[#59413c] uppercase tracking-wider">
+                        Hosting Soon
+                      </p>
+                      <div className="space-y-1.5">
+                        {profileData.hostedActivities.map((act) => (
+                          <button
+                            key={act._id}
+                            type="button"
+                            onClick={() => {
+                              setProfileOpen(false);
+                              navigate(`/app/activities/${act._id}`);
+                            }}
+                            className="w-full text-left p-2.5 rounded-xl bg-[#f9f9ff] hover:bg-[#f0f3ff] border border-[#e0bfb8]/30 transition"
+                          >
+                            <p className="text-xs font-bold text-[#111c2d] truncate">
+                              {act.title}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[#59413c]">
+                              <span className="inline-flex items-center gap-0.5">
+                                <CalendarBlank weight="duotone" className="w-3 h-3 text-[#a93017]" />
+                                {new Date(act.startTime).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                              <span className="inline-flex items-center gap-0.5 truncate">
+                                <MapPin weight="duotone" className="w-3 h-3 text-[#a93017]" />
+                                {act.meetingPoint}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    {activeRoom?.type === 'GROUP' && (
+                      <button
+                        type="button"
+                        disabled={profileBusy}
+                        onClick={() => startDirectChat(profileData.userId)}
+                        className="w-full py-2.5 rounded-full bg-[#14241E] hover:bg-emerald-950 text-emerald-300 text-xs font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {profileBusy ? (
+                          <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ChatCircleDots weight="duotone" className="w-4 h-4" />
+                        )}
+                        Message {profileData.nickname}
+                      </button>
+                    )}
+
+                    {!confirmBlock ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmBlock(true)}
+                        className="w-full py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                      >
+                        <Prohibit weight="duotone" className="w-3.5 h-3.5" />
+                        Block {profileData.nickname}
+                      </button>
+                    ) : (
+                      <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                        <p className="text-[11px] font-semibold text-rose-800 text-center">
+                          Block {profileData.nickname}? You won&apos;t see each other in Discover or Chat.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmBlock(false)}
+                            className="flex-1 py-1.5 rounded-full bg-white text-slate-600 text-xs font-bold border border-slate-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={profileBusy}
+                            onClick={() => blockFromProfile(profileData.userId)}
+                            className="flex-1 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center justify-center gap-1 disabled:opacity-60"
+                          >
+                            {profileBusy && <CircleNotch className="w-3 h-3 animate-spin" />}
+                            Confirm Block
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 

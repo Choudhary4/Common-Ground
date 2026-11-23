@@ -489,6 +489,63 @@ router.post('/push/unsubscribe', async (req, res, next) => {
   }
 });
 
+router.get('/profile/:userId', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const { userId } = req.params;
+    if (!Types.ObjectId.isValid(userId)) {
+      res.status(400).json({ error: 'Invalid traveller ID' });
+      return;
+    }
+
+    const target = await User.findOne({
+      _id: userId,
+      hostelId,
+      status: 'ACTIVE',
+    })
+      .select('_id nickname avatar interests createdAt')
+      .lean();
+
+    if (!target) {
+      res.status(404).json({ error: 'Traveller not found in your hostel' });
+      return;
+    }
+
+    const now = new Date();
+    const [activeStatus, hostedActivities] = await Promise.all([
+      SocialStatus.findOne({
+        userId: target._id,
+        hostelId,
+        expiresAt: { $gt: now },
+      }).lean(),
+      Activity.find({
+        hostelId,
+        hostId: target._id,
+        status: 'OPEN',
+        startTime: { $gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
+      })
+        .select('_id title category startTime meetingPoint')
+        .sort({ startTime: 1 })
+        .limit(5)
+        .lean(),
+    ]);
+
+    res.json({
+      profile: {
+        userId: target._id.toString(),
+        nickname: target.nickname,
+        avatar: target.avatar ?? null,
+        interests: target.interests ?? [],
+        socialStatus: activeStatus?.status ?? null,
+        joinedAt: target.createdAt,
+        hostedActivities,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/push/test', async (req, res, next) => {
   try {
     const result = await sendPushToUser(req.auth!.userId, {
