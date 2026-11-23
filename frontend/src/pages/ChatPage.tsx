@@ -9,6 +9,7 @@ import {
   CircleNotch,
   X,
   Check,
+  Checks,
   UserPlus,
   UserMinus,
   SignOut,
@@ -61,6 +62,7 @@ export function ChatPage() {
   const [rooms, setRooms] = useState<ChatRoomItem[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
+  const [readBy, setReadBy] = useState<Record<string, string>>({});
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -91,8 +93,13 @@ export function ChatPage() {
   const loadMessages = useCallback(async (id: string) => {
     setLoadingMsgs(true);
     try {
-      const res = await apiRequest<{ messages: ChatMessageItem[] }>(`/chat/rooms/${id}/messages`);
+      const res = await apiRequest<{
+        messages: ChatMessageItem[];
+        readBy?: Record<string, string>;
+      }>(`/chat/rooms/${id}/messages`);
       setMessages(res.messages);
+      setReadBy(res.readBy ?? {});
+      setRooms((prev) => prev.map((r) => (r._id === id ? { ...r, unreadCount: 0 } : r)));
       window.dispatchEvent(new Event('chat:read'));
     } finally {
       setLoadingMsgs(false);
@@ -101,13 +108,14 @@ export function ChatPage() {
 
   useEffect(() => {
     void loadRooms();
-  }, [loadRooms]);
+  }, [loadRooms, roomId]);
 
   useEffect(() => {
     if (roomId) {
       void loadMessages(roomId);
     } else {
       setMessages([]);
+      setReadBy({});
     }
   }, [roomId, loadMessages]);
 
@@ -120,18 +128,35 @@ export function ChatPage() {
     const onMessage = (msg: ChatMessageItem) => {
       if (roomId && msg.roomId === roomId) {
         setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
+        if (msg.senderId !== user?.id) {
+          void apiRequest(`/chat/rooms/${roomId}/read`, { method: 'POST' })
+            .then(() => {
+              setRooms((prev) =>
+                prev.map((r) => (r._id === roomId ? { ...r, unreadCount: 0 } : r))
+              );
+              window.dispatchEvent(new Event('chat:read'));
+            })
+            .catch(() => {});
+        }
       }
       void loadRooms();
+    };
+    const onSeen = (data: { roomId: string; userId: string; readAt: string }) => {
+      if (roomId && data.roomId === roomId) {
+        setReadBy((prev) => ({ ...prev, [data.userId]: data.readAt }));
+      }
     };
     const onRoomCreated = () => void loadRooms();
 
     socket.on('chat:message', onMessage);
+    socket.on('chat:seen', onSeen);
     socket.on('chat:room_created', onRoomCreated);
     return () => {
       socket.off('chat:message', onMessage);
+      socket.off('chat:seen', onSeen);
       socket.off('chat:room_created', onRoomCreated);
     };
-  }, [roomId, loadRooms]);
+  }, [roomId, loadRooms, user?.id]);
 
   const openGroupModal = async () => {
     setGroupModalOpen(true);
@@ -309,6 +334,10 @@ export function ChatPage() {
             ) : (
               messages.map((m) => {
                 const mine = m.senderId === user?.id;
+                const msgTime = new Date(m.createdAt).getTime();
+                const isSeen =
+                  mine &&
+                  Object.values(readBy).some((ts) => new Date(ts).getTime() >= msgTime);
                 return (
                   <div
                     key={m._id}
@@ -334,16 +363,34 @@ export function ChatPage() {
                         </p>
                       )}
                       <p className="break-words">{m.text}</p>
-                      <p
-                        className={`text-[9px] mt-1 text-right ${
+                      <div
+                        className={`text-[9px] mt-1 flex items-center justify-end gap-1 ${
                           mine ? 'text-emerald-200/70' : 'text-slate-400'
                         }`}
                       >
-                        {new Date(m.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                        <span>
+                          {new Date(m.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {mine &&
+                          (isSeen ? (
+                            <span title="Seen" className="inline-flex items-center">
+                              <Checks
+                                weight="bold"
+                                className="w-3.5 h-3.5 text-emerald-400"
+                              />
+                            </span>
+                          ) : (
+                            <span title="Sent" className="inline-flex items-center">
+                              <Check
+                                weight="bold"
+                                className="w-3 h-3 text-emerald-200/50"
+                              />
+                            </span>
+                          ))}
+                      </div>
                     </div>
                   </div>
                 );

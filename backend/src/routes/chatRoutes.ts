@@ -302,10 +302,22 @@ router.get('/rooms/:roomId/messages', async (req, res, next) => {
       return;
     }
 
+    const now = new Date();
     await ChatRoom.updateOne(
       { _id: room._id },
-      { $set: { [`lastReadAt.${myId.toString()}`]: new Date() } }
+      { $set: { [`lastReadAt.${myId.toString()}`]: now } }
     );
+
+    // Notify other room members in real time that this user has seen the chat
+    for (const memberId of room.memberIds) {
+      if (memberId.toString() !== myId.toString()) {
+        emitToUser(memberId.toString(), 'chat:seen', {
+          roomId: room._id.toString(),
+          userId: myId.toString(),
+          readAt: now.toISOString(),
+        });
+      }
+    }
 
     const messages = await ChatMessage.find({ roomId: room._id, hostelId })
       .sort({ createdAt: 1 })
@@ -318,7 +330,16 @@ router.get('/rooms/:roomId/messages', async (req, res, next) => {
       .lean();
     const sMap = new Map(senders.map((s) => [s._id.toString(), s]));
 
+    const readBy: Record<string, string> = {};
+    const rawReadMap = (room.lastReadAt ?? {}) as unknown as Record<string, Date>;
+    for (const [uid, ts] of Object.entries(rawReadMap)) {
+      if (uid !== myId.toString() && ts) {
+        readBy[uid] = new Date(ts).toISOString();
+      }
+    }
+
     res.json({
+      readBy,
       messages: messages.map((m) => ({
         _id: m._id,
         roomId: m.roomId,
@@ -329,6 +350,40 @@ router.get('/rooms/:roomId/messages', async (req, res, next) => {
         createdAt: m.createdAt,
       })),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/rooms/:roomId/read', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const myId = req.auth!.userId.toString();
+
+    const room = await ChatRoom.findOne({
+      _id: req.params.roomId,
+      hostelId,
+      memberIds: req.auth!.userId,
+    }).lean();
+    if (!room) {
+      res.status(404).json({ error: 'Chat room not found' });
+      return;
+    }
+
+    const now = new Date();
+    await ChatRoom.updateOne({ _id: room._id }, { $set: { [`lastReadAt.${myId}`]: now } });
+
+    for (const memberId of room.memberIds) {
+      if (memberId.toString() !== myId) {
+        emitToUser(memberId.toString(), 'chat:seen', {
+          roomId: room._id.toString(),
+          userId: myId,
+          readAt: now.toISOString(),
+        });
+      }
+    }
+
+    res.json({ readAt: now.toISOString() });
   } catch (err) {
     next(err);
   }
