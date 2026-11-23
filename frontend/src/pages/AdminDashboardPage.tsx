@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react';
+import {
+  Buildings,
+  UserPlus,
+  CircleNotch,
+  Eye,
+  EyeSlash,
+  QrCode,
+  UsersThree,
+  CalendarCheck,
+  Sparkle,
+  ChartBar,
+  CheckCircle,
+} from '@phosphor-icons/react';
 import { StaffLayout } from '../components/StaffLayout';
 import { apiRequest, ApiError } from '../lib/api';
 
@@ -95,7 +107,7 @@ export function AdminDashboardPage() {
       setHName('');
       setHCity('');
       setHAddr('');
-      setMsg('Hostel created!');
+      setMsg('Hostel property created!');
       await load();
     } catch (err) {
       setMsg(err instanceof ApiError ? err.message : 'Failed to create hostel');
@@ -132,70 +144,91 @@ export function AdminDashboardPage() {
   };
 
   return (
-    <StaffLayout title="Central Admin" subtitle="Platform Properties, Managers & Staff">
+    <StaffLayout title="Central Admin" subtitle="Platform Properties, Managers & Real Adoption">
       <div className="space-y-6">
+        {/* KPI Row */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">QR Scans (Real)</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-[#59413c]">QR Scans</p>
+              <QrCode weight="duotone" className="w-4 h-4 text-[#a93017]" />
+            </div>
+            <p className="text-2xl font-extrabold text-[#111c2d] mt-1.5">
               {overview?.realMetrics.qrScans ?? '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Travellers Joined</p>
-            <p className="text-2xl font-extrabold text-emerald-700 mt-1">
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-[#59413c]">Travellers</p>
+              <UsersThree weight="duotone" className="w-4 h-4 text-emerald-700" />
+            </div>
+            <p className="text-2xl font-extrabold text-emerald-700 mt-1.5">
               {overview?.realMetrics.travellersOnboarded ?? '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Activities Created</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-[#59413c]">Activities</p>
+              <CalendarCheck weight="duotone" className="w-4 h-4 text-[#14241E]" />
+            </div>
+            <p className="text-2xl font-extrabold text-[#111c2d] mt-1.5">
               {overview?.realMetrics.activitiesCreated ?? '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4">
-            <p className="text-xs text-slate-500">Activity Joins</p>
-            <p className="text-2xl font-extrabold text-emerald-700 mt-1">
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-[#59413c]">Real Joins</p>
+              <Sparkle weight="duotone" className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-extrabold text-emerald-700 mt-1.5">
               {overview?.realMetrics.activitiesJoined ?? '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-4 col-span-2 sm:col-span-1">
-            <p className="text-xs text-slate-500">Active Hostels</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">
+          <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-4 shadow-2xs col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-[#59413c]">Active Hostels</p>
+              <Buildings weight="duotone" className="w-4 h-4 text-[#a93017]" />
+            </div>
+            <p className="text-2xl font-extrabold text-[#111c2d] mt-1.5">
               {overview?.activeHostels ?? '—'}
             </p>
           </div>
         </div>
 
+        {/* Hostel-wise Breakdown Table */}
         {overview?.hostelBreakdown && overview.hostelBreakdown.length > 0 && (
-          <div className="bg-white rounded-2xl border border-amber-200/80 p-5 overflow-x-auto">
-            <h3 className="text-sm font-bold text-slate-900 mb-3">
-              Hostel-wise Real Adoption (Excludes Demo Data)
-            </h3>
+          <div className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 sm:p-6 shadow-xs overflow-x-auto">
+            <div className="flex items-center gap-2 mb-4">
+              <ChartBar weight="duotone" className="w-5 h-5 text-[#a93017]" />
+              <h3 className="text-sm font-extrabold text-[#111c2d]">
+                Hostel-wise Real Adoption (Excludes Demo Data)
+              </h3>
+            </div>
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="py-2 pr-4 font-semibold">Hostel</th>
-                  <th className="py-2 px-3 font-semibold">QR Scans</th>
-                  <th className="py-2 px-3 font-semibold">Travellers</th>
-                  <th className="py-2 px-3 font-semibold">Activities</th>
-                  <th className="py-2 px-3 font-semibold">Joins</th>
-                  <th className="py-2 pl-3 font-semibold">Completed</th>
+                <tr className="border-b border-[#e0bfb8]/30 text-[#59413c]">
+                  <th className="py-2.5 pr-4 font-bold">Hostel</th>
+                  <th className="py-2.5 px-3 font-bold">QR Scans</th>
+                  <th className="py-2.5 px-3 font-bold">Travellers</th>
+                  <th className="py-2.5 px-3 font-bold">Activities</th>
+                  <th className="py-2.5 px-3 font-bold">Joins</th>
+                  <th className="py-2.5 pl-3 font-bold">Completed</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {overview.hostelBreakdown.map((row) => (
-                  <tr key={row.hostelId}>
-                    <td className="py-2.5 pr-4 font-semibold text-slate-900">
-                      {row.name} <span className="font-normal text-slate-500">· {row.city}</span>
+                  <tr key={row.hostelId} className="hover:bg-[#f9f9ff]">
+                    <td className="py-3 pr-4 font-bold text-[#111c2d]">
+                      {row.name}{' '}
+                      <span className="font-medium text-[#59413c]">· {row.city}</span>
                     </td>
-                    <td className="py-2.5 px-3">{row.qrScans}</td>
-                    <td className="py-2.5 px-3 font-semibold text-emerald-700">
+                    <td className="py-3 px-3 font-semibold">{row.qrScans}</td>
+                    <td className="py-3 px-3 font-extrabold text-emerald-700">
                       {row.travellersOnboarded}
                     </td>
-                    <td className="py-2.5 px-3">{row.activitiesCreated}</td>
-                    <td className="py-2.5 px-3">{row.activitiesJoined}</td>
-                    <td className="py-2.5 pl-3">{row.activitiesCompleted}</td>
+                    <td className="py-3 px-3 font-semibold">{row.activitiesCreated}</td>
+                    <td className="py-3 px-3 font-semibold">{row.activitiesJoined}</td>
+                    <td className="py-3 pl-3 font-semibold">{row.activitiesCompleted}</td>
                   </tr>
                 ))}
               </tbody>
@@ -204,65 +237,71 @@ export function AdminDashboardPage() {
         )}
 
         {msg && (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
-            {msg}
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-900 flex items-center gap-2">
+            <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{msg}</span>
           </div>
         )}
 
+        {/* Creation Forms */}
         <div className="grid md:grid-cols-2 gap-6">
           <form
             onSubmit={createHostel}
-            className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3"
+            className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 sm:p-6 space-y-3.5 shadow-xs"
           >
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-[#E85D3F]" />
-              <h2 className="text-base font-bold text-slate-900">Add Hostel Property</h2>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#f0f3ff] text-[#14241E] flex items-center justify-center">
+                <Buildings weight="duotone" className="w-5 h-5" />
+              </div>
+              <h2 className="text-sm font-extrabold text-[#111c2d]">Add Hostel Property</h2>
             </div>
             <input
               required
               value={hName}
               onChange={(e) => setHName(e.target.value)}
               placeholder="goSTOPS Manali"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
             />
             <input
               required
               value={hCity}
               onChange={(e) => setHCity(e.target.value)}
               placeholder="City"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
             />
             <input
               required
               value={hAddr}
               onChange={(e) => setHAddr(e.target.value)}
               placeholder="Full address"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
             />
             <button
               type="submit"
               disabled={creatingHostel}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14241E] hover:bg-emerald-950 text-emerald-300 text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-60"
             >
-              {creatingHostel && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {creatingHostel && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
               {creatingHostel ? 'Creating Hostel...' : 'Create Hostel'}
             </button>
           </form>
 
           <form
             onSubmit={createStaff}
-            className="bg-white rounded-2xl border border-amber-200/80 p-5 space-y-3"
+            className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 sm:p-6 space-y-3.5 shadow-xs"
           >
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-[#E85D3F]" />
-              <h2 className="text-base font-bold text-slate-900">Add Hostel Manager</h2>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#ffdad3]/60 text-[#a93017] flex items-center justify-center">
+                <UserPlus weight="duotone" className="w-5 h-5" />
+              </div>
+              <h2 className="text-sm font-extrabold text-[#111c2d]">Add Hostel Manager</h2>
             </div>
             <input
               required
               value={sName}
               onChange={(e) => setSName(e.target.value)}
               placeholder="Full Name"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
             />
             <input
               type="email"
@@ -270,7 +309,7 @@ export function AdminDashboardPage() {
               value={sEmail}
               onChange={(e) => setSEmail(e.target.value)}
               placeholder="Email"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
             />
             <div className="relative">
               <input
@@ -280,21 +319,25 @@ export function AdminDashboardPage() {
                 value={sPass}
                 onChange={(e) => setSPass(e.target.value)}
                 placeholder="Password (min 8 chars)"
-                className="w-full px-3 py-2 pr-10 rounded-xl border border-slate-300 text-sm"
+                className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d] focus:outline-none focus:ring-2 focus:ring-[#a93017]/20 focus:border-[#a93017]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#111c2d]"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? (
+                  <EyeSlash weight="duotone" className="w-4 h-4" />
+                ) : (
+                  <Eye weight="duotone" className="w-4 h-4" />
+                )}
               </button>
             </div>
             <select
               value={sHostelId}
               onChange={(e) => setSHostelId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d]"
             >
               {hostels.map((h) => (
                 <option key={h._id} value={h._id}>
@@ -305,49 +348,60 @@ export function AdminDashboardPage() {
             <button
               type="submit"
               disabled={creatingManager}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#E85D3F] text-white text-xs font-semibold disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#a93017] hover:bg-[#cb482c] text-white text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-60"
             >
-              {creatingManager && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {creatingManager && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
               {creatingManager ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
         </div>
 
-        <div className="bg-white rounded-2xl border border-amber-200/80 p-5">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">Hostels ({hostels.length})</h3>
-          <div className="divide-y divide-slate-100 text-sm">
-            {hostels.map((h) => (
-              <div key={h._id} className="py-2.5 flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-slate-900">{h.name}</span>{' '}
-                  <span className="text-xs text-slate-500">· {h.city}</span>
-                  {h.isDemo && (
-                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800">
-                      Demo
-                    </span>
-                  )}
+        {/* Hostels & Team Accounts Lists */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 shadow-xs">
+            <h3 className="text-sm font-extrabold text-[#111c2d] mb-3">
+              Hostels ({hostels.length})
+            </h3>
+            <div className="divide-y divide-slate-100 text-sm">
+              {hostels.map((h) => (
+                <div key={h._id} className="py-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-[#111c2d]">{h.name}</span>{' '}
+                    <span className="text-xs text-[#59413c]">· {h.city}</span>
+                    {h.isDemo && (
+                      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                        Demo
+                      </span>
+                    )}
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold shrink-0">
+                    {h.status}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-emerald-700">{h.status}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-amber-200/80 p-5">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">Team Accounts ({staff.length})</h3>
-          <div className="divide-y divide-slate-100 text-sm">
-            {staff.map((s) => (
-              <div key={s.id} className="py-2.5 flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-slate-900">{s.nickname}</span>{' '}
-                  <span className="text-xs text-slate-500">({s.email})</span>
-                  <p className="text-xs text-slate-500">
-                    {s.role} · {s.hostelName}
-                  </p>
+          <div className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 shadow-xs">
+            <h3 className="text-sm font-extrabold text-[#111c2d] mb-3">
+              Team Accounts ({staff.length})
+            </h3>
+            <div className="divide-y divide-slate-100 text-sm">
+              {staff.map((s) => (
+                <div key={s.id} className="py-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-bold text-[#111c2d]">{s.nickname}</span>{' '}
+                    <span className="text-xs text-[#59413c]">({s.email})</span>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {s.role.replace('_', ' ')} · {s.hostelName ?? 'All Properties'}
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold shrink-0">
+                    {s.status}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-emerald-700">{s.status}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
