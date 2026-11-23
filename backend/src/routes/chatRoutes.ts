@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Types } from 'mongoose';
-import { ChatRoom, ChatMessage, User } from '../models/index.js';
+import { ChatRoom, ChatMessage, User, Notification } from '../models/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope } from '../middleware/rbac.js';
 import { emitToUser } from '../services/socketService.js';
@@ -40,6 +40,7 @@ router.get('/rooms', async (req, res, next) => {
         type: r.type,
         name: r.type === 'GROUP' ? r.name : (other?.nickname ?? 'Traveller'),
         avatar: r.type === 'DIRECT' ? (other?.avatar ?? null) : null,
+        createdBy: r.createdBy.toString(),
         members,
         lastMessageText: r.lastMessageText,
         lastMessageAt: r.lastMessageAt,
@@ -143,10 +144,133 @@ router.post('/rooms/group', async (req, res, next) => {
     });
 
     for (const u of validUsers) {
-      emitToUser(u._id.toString(), 'chat:room_created', { roomId: room._id });
+      const uidStr = u._id.toString();
+      emitToUser(uidStr, 'chat:room_created', { roomId: room._id });
+      if (uidStr !== myId.toString()) {
+        const notif = await Notification.create({
+          userId: u._id,
+          hostelId,
+          type: 'GROUP_ADDED',
+          title: `Added to group: ${name}`,
+          message: `${req.auth!.nickname} added you to "${name}".`,
+          referenceId: room._id,
+        });
+        emitToUser(uidStr, 'notification:new', notif);
+        void sendPushToUser(u._id, {
+          title: notif.title,
+          body: notif.message,
+          url: `/app/chat/${room._id}`,
+        });
+      }
     }
 
     res.status(201).json({ roomId: room._id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/rooms/:roomId/members', async (req, res, next) => {
+  try {
+    const { targetUserId } = z.object({ targetUserId: z.string().min(1) }).parse(req.body);
+    const hostelId = req.auth!.hostelId!;
+    const myId = req.auth!.userId;
+
+    const room = await ChatRoom.findOne({
+      _id: req.params.roomId,
+      hostelId,
+      type: 'GROUP',
+      memberIds: myId,
+    });
+    if (!room) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+
+    const target = await User.findOne({ _id: targetUserId, hostelId, status: 'ACTIVE' }).lean();
+    if (!target) {
+      res.status(404).json({ error: 'Traveller not found in your hostel' });
+      return;
+    }
+
+    if (room.memberIds.some((id) => id.toString() === targetUserId)) {
+      res.status(409).json({ error: 'Traveller is already in this group' });
+      return;
+    }
+
+    room.memberIds.push(target._id);
+    await room.save();
+
+    const notif = await Notification.create({
+      userId: target._id,
+      hostelId,
+      type: 'GROUP_ADDED',
+      title: `Added to group: ${room.name}`,
+      message: `${req.auth!.nickname} added you to "${room.name}".`,
+      referenceId: room._id,
+    });
+
+    emitToUser(targetUserId, 'chat:room_created', { roomId: room._id });
+    emitToUser(targetUserId, 'notification:new', notif);
+    void sendPushToUser(target._id, {
+      title: notif.title,
+      body: notif.message,
+      url: `/app/chat/${room._id}`,
+    });
+
+    res.status(201).json({ message: 'Member added' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/rooms/:roomId/members/:memberId', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const myId = req.auth!.userId.toString();
+    const targetId = req.params.memberId;
+
+    const room = await ChatRoom.findOne({
+      _id: req.params.roomId,
+      hostelId,
+      type: 'GROUP',
+      memberIds: req.auth!.userId,
+    });
+    if (!room) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+
+    const isSelfLeave = targetId === myId;
+    const isCreator = room.createdBy.toString() === myId;
+    if (!isSelfLeave && !isCreator) {
+      res.status(403).json({ error: 'Only the group creator can remove members' });
+      return;
+    }
+
+    room.memberIds = room.memberIds.filter((id) => id.toString() !== targetId);
+    await room.save();
+
+    emitToUser(targetId, 'chat:room_created', { roomId: room._id });
+
+    if (!isSelfLeave) {
+      const notif = await Notification.create({
+        userId: new Types.ObjectId(targetId),
+        hostelId,
+        type: 'GROUP_REMOVED',
+        title: `Removed from group: ${room.name}`,
+        message: `${req.auth!.nickname} removed you from "${room.name}".`,
+        referenceId: null,
+      });
+      emitToUser(targetId, 'notification:new', notif);
+      void sendPushToUser(targetId, {
+        title: notif.title,
+        body: notif.message,
+        url: '/app/notifications',
+      });
+    }
+
+    res.json({ message: isSelfLeave ? 'Left group' : 'Member removed' });
   } catch (err) {
     next(err);
   }

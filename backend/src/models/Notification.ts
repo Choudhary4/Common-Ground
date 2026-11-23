@@ -11,7 +11,9 @@ export type NotificationType =
   | 'JOIN_REQUEST_DECLINED'
   | 'ACTIVITY_FULL'
   | 'ACTIVITY_INVITE'
-  | 'HOST_TRANSFERRED';
+  | 'HOST_TRANSFERRED'
+  | 'GROUP_ADDED'
+  | 'GROUP_REMOVED';
 
 export interface INotification extends Document {
   userId: Types.ObjectId;

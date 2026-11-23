@@ -11,6 +11,8 @@ import {
   PaperPlaneTilt,
   Crown,
   CaretRight,
+  UsersThree,
+  UserMinus,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest } from '../lib/api';
@@ -49,6 +51,10 @@ function getNotifStyle(type?: string) {
       return { icon: PaperPlaneTilt, bg: 'bg-[#ffdad3]/60', color: 'text-[#a93017]' };
     case 'HOST_TRANSFERRED':
       return { icon: Crown, bg: 'bg-amber-50', color: 'text-amber-700' };
+    case 'GROUP_ADDED':
+      return { icon: UsersThree, bg: 'bg-emerald-50', color: 'text-emerald-700' };
+    case 'GROUP_REMOVED':
+      return { icon: UserMinus, bg: 'bg-rose-50', color: 'text-rose-600' };
     default:
       return { icon: BellRinging, bg: 'bg-[#f0f3ff]', color: 'text-[#14241E]' };
   }
@@ -101,7 +107,11 @@ export function NotificationsPage() {
       void apiRequest(`/traveller/notifications/${n._id}/read`, { method: 'PATCH' });
     }
     if (n.referenceId) {
-      navigate(`/app/activities/${n.referenceId}`);
+      if (n.type === 'GROUP_ADDED') {
+        navigate(`/app/chat/${n.referenceId}`);
+      } else {
+        navigate(`/app/activities/${n.referenceId}`);
+      }
     }
   };
 
