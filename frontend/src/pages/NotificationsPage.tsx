@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest } from '../lib/api';
+import { getSocket } from '../lib/socket';
 
 interface NotificationItem {
   _id: string;
@@ -17,21 +18,34 @@ export function NotificationsPage() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await apiRequest<{ notifications: NotificationItem[] }>('/traveller/notifications');
       setItems(res.notifications);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+    const socket = getSocket();
+    const refresh = () => void load();
+    socket.on('notification:new', refresh);
+    socket.on('join_request:received', refresh);
+    socket.on('join_request:accepted', refresh);
+    socket.on('join_request:declined', refresh);
+    return () => {
+      socket.off('notification:new', refresh);
+      socket.off('join_request:received', refresh);
+      socket.off('join_request:accepted', refresh);
+      socket.off('join_request:declined', refresh);
+    };
+  }, [load]);
 
   const markAllRead = async () => {
     await apiRequest('/traveller/notifications/read-all', { method: 'POST' });
+    window.dispatchEvent(new Event('notifications:read-all'));
     void load();
   };
 

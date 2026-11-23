@@ -30,10 +30,12 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
 
     const socket = getSocket();
     const onNew = () => setUnreadCount((c) => c + 1);
+    const onReadAll = () => setUnreadCount(0);
     socket.on('notification:new', onNew);
     socket.on('join_request:received', onNew);
     socket.on('join_request:accepted', onNew);
     socket.on('join_request:declined', onNew);
+    window.addEventListener('notifications:read-all', onReadAll);
 
     return () => {
       active = false;
@@ -41,6 +43,7 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
       socket.off('join_request:received', onNew);
       socket.off('join_request:accepted', onNew);
       socket.off('join_request:declined', onNew);
+      window.removeEventListener('notifications:read-all', onReadAll);
     };
   }, [location.pathname]);
 
