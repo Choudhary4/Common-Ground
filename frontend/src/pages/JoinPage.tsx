@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, ArrowRight, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { apiRequest, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { enablePushNotifications, isPushSupported } from '../lib/push';
 import { Footer } from '../components/Footer';
 
 interface HostelInfo {
@@ -75,6 +76,9 @@ export function JoinPage() {
         }),
       });
       await refreshAuth();
+      if (isPushSupported() && Notification.permission === 'default') {
+        await enablePushNotifications().catch(() => {});
+      }
       navigate('/app', { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
