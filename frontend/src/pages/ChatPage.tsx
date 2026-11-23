@@ -121,7 +121,46 @@ export function ChatPage() {
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
 
+  // Mobile virtual keyboard visualViewport lock (keeps header pinned at top when keyboard opens)
+  const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!roomId) {
+      setViewportStyle({});
+      return;
+    }
+
+    const prevOverflow = document.body.style.overflow;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
+    const syncViewport = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      setViewportStyle({
+        height: `${vv.height}px`,
+        top: `${vv.offsetTop}px`,
+      });
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    };
+
+    syncViewport();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', syncViewport);
+    vv?.addEventListener('scroll', syncViewport);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+      vv?.removeEventListener('resize', syncViewport);
+      vv?.removeEventListener('scroll', syncViewport);
+    };
+  }, [roomId]);
 
   const loadRooms = useCallback(async () => {
     try {
@@ -400,11 +439,14 @@ export function ChatPage() {
       ? activeRoom.members.find((m) => m.userId !== user?.id) ?? null
       : null;
 
-  // Conversation Thread View (Instagram-style fixed viewport; only messages scroll inside)
+  // Conversation Thread View (Instagram-style fixed visualViewport; header stays pinned even with mobile keyboard)
   if (roomId) {
     return (
-      <div className="fixed inset-0 h-[100dvh] z-40 bg-[#f9f9ff] flex justify-center overflow-hidden">
-        <div className="w-full max-w-2xl h-full sm:my-3 sm:h-[calc(100dvh-1.5rem)] flex flex-col bg-white sm:rounded-2xl sm:border sm:border-[#e0bfb8]/35 sm:shadow-sm overflow-hidden">
+      <div
+        style={viewportStyle}
+        className="fixed left-0 right-0 top-0 h-[100dvh] z-40 bg-[#f9f9ff] flex justify-center overflow-hidden"
+      >
+        <div className="w-full max-w-2xl h-full sm:my-3 sm:h-[calc(100%-1.5rem)] flex flex-col bg-white sm:rounded-2xl sm:border sm:border-[#e0bfb8]/35 sm:shadow-sm overflow-hidden">
           {/* Pinned Thread Header */}
           <div className="shrink-0 px-4 py-3 border-b border-[#e0bfb8]/30 bg-[#f9f9ff] flex items-center gap-3">
             <button
@@ -566,7 +608,7 @@ export function ChatPage() {
               onChange={(e) => setText(e.target.value)}
               placeholder="Write a message..."
               maxLength={500}
-              className="flex-1 px-4 py-2.5 rounded-full bg-[#f0f3ff] text-xs text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20"
+              className="flex-1 px-4 py-2.5 rounded-full bg-[#f0f3ff] text-[16px] sm:text-xs text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20"
             />
             <button
               type="submit"
