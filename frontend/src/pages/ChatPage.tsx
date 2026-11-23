@@ -16,9 +16,10 @@ import {
   CalendarBlank,
   MapPin,
   Prohibit,
+  PencilSimple,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
-import { Avatar } from '../components/Avatar';
+import { Avatar, GROUP_PRESET_AVATARS } from '../components/Avatar';
 import { apiRequest, ApiError } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,7 @@ interface ChatRoomItem {
   _id: string;
   type: 'DIRECT' | 'GROUP';
   name: string;
+  description?: string;
   avatar: string | null;
   createdBy?: string;
   members: RoomMember[];
@@ -96,14 +98,21 @@ export function ChatPage() {
   // Create group modal
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [groupAvatar, setGroupAvatar] = useState<string | null>(GROUP_PRESET_AVATARS[0]);
   const [hostelTravellers, setHostelTravellers] = useState<HostelTraveller[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
 
-  // Group members modal
+  // Group details & members modal
   const [membersModalOpen, setMembersModalOpen] = useState(false);
   const [memberActionId, setMemberActionId] = useState<string | null>(null);
+  const [editingGroup, setEditingGroup] = useState(false);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupDesc, setEditGroupDesc] = useState('');
+  const [editGroupAvatar, setEditGroupAvatar] = useState<string | null>(null);
+  const [savingGroup, setSavingGroup] = useState(false);
 
   // Traveller profile modal (in-chat)
   const [profileOpen, setProfileOpen] = useState(false);
@@ -184,10 +193,12 @@ export function ChatPage() {
     socket.on('chat:message', onMessage);
     socket.on('chat:seen', onSeen);
     socket.on('chat:room_created', onRoomCreated);
+    socket.on('chat:room_updated', onRoomCreated);
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:seen', onSeen);
       socket.off('chat:room_created', onRoomCreated);
+      socket.off('chat:room_updated', onRoomCreated);
     };
   }, [roomId, loadRooms, user?.id]);
 
@@ -195,6 +206,8 @@ export function ChatPage() {
     setGroupModalOpen(true);
     setGroupError(null);
     setGroupName('');
+    setGroupDescription('');
+    setGroupAvatar(GROUP_PRESET_AVATARS[0]);
     setSelectedMembers(new Set());
     try {
       const res = await apiRequest<{ travellers: HostelTraveller[] }>('/traveller/discover');
@@ -226,6 +239,8 @@ export function ChatPage() {
         method: 'POST',
         body: JSON.stringify({
           name: groupName.trim(),
+          description: groupDescription.trim(),
+          avatar: groupAvatar,
           memberIds: [...selectedMembers],
         }),
       });
@@ -264,11 +279,38 @@ export function ChatPage() {
 
   const openMembersModal = async () => {
     setMembersModalOpen(true);
+    setEditingGroup(false);
+    const current = rooms.find((r) => r._id === roomId);
+    if (current) {
+      setEditGroupName(current.name);
+      setEditGroupDesc(current.description ?? '');
+      setEditGroupAvatar(current.avatar);
+    }
     try {
       const res = await apiRequest<{ travellers: HostelTraveller[] }>('/traveller/discover');
       setHostelTravellers(res.travellers);
     } catch {
       setHostelTravellers([]);
+    }
+  };
+
+  const handleSaveGroupDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roomId || !editGroupName.trim()) return;
+    setSavingGroup(true);
+    try {
+      await apiRequest(`/chat/rooms/${roomId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editGroupName.trim(),
+          description: editGroupDesc.trim(),
+          avatar: editGroupAvatar,
+        }),
+      });
+      setEditingGroup(false);
+      await loadRooms();
+    } finally {
+      setSavingGroup(false);
     }
   };
 
@@ -374,24 +416,38 @@ export function ChatPage() {
             </button>
             {activeRoom?.type === 'GROUP' ? (
               <>
-                <div className="w-9 h-9 rounded-xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
-                  <UsersThree weight="duotone" className="w-5 h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
-                    {activeRoom.name}
-                  </h2>
-                  <p className="text-[11px] text-[#59413c] truncate">
-                    {activeRoom.members.map((m) => m.nickname).join(', ')}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={openMembersModal}
+                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-xl py-0.5 pr-2 hover:bg-[#f0f3ff]/80 transition"
+                >
+                  {activeRoom.avatar ? (
+                    <Avatar
+                      src={activeRoom.avatar}
+                      name={activeRoom.name}
+                      className="w-9 h-9 rounded-xl shrink-0"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
+                      <UsersThree weight="duotone" className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-extrabold text-[#111c2d] truncate">
+                      {activeRoom.name}
+                    </h2>
+                    <p className="text-[11px] text-[#59413c] truncate">
+                      Tap for group info · {activeRoom.members.length} members
+                    </p>
+                  </div>
+                </button>
                 <button
                   type="button"
                   onClick={openMembersModal}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] text-[11px] font-bold shrink-0"
                 >
                   <UsersThree weight="duotone" className="w-3.5 h-3.5" />
-                  Members ({activeRoom.members.length})
+                  Info
                 </button>
               </>
             ) : (
@@ -527,13 +583,19 @@ export function ChatPage() {
           </form>
         </div>
 
-        {/* Group Members Modal */}
+        {/* Group Details & Members Modal */}
         {membersModalOpen && activeRoom?.type === 'GROUP' && (
-          <div className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35 max-h-[85vh] overflow-y-auto">
+          <div
+            className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setMembersModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35 max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between">
                 <h3 className="font-extrabold text-[#111c2d] text-base">
-                  {activeRoom.name} · Members
+                  Group Info
                 </h3>
                 <button
                   type="button"
@@ -544,7 +606,118 @@ export function ChatPage() {
                 </button>
               </div>
 
+              {!editingGroup ? (
+                <div className="flex flex-col items-center text-center gap-2 pb-3 border-b border-slate-100">
+                  {activeRoom.avatar ? (
+                    <Avatar
+                      src={activeRoom.avatar}
+                      name={activeRoom.name}
+                      className="w-16 h-16 rounded-2xl shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center shadow-sm">
+                      <UsersThree weight="duotone" className="w-8 h-8" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-base font-extrabold text-[#111c2d]">
+                      {activeRoom.name}
+                    </h4>
+                    <p className="text-xs text-[#59413c] mt-0.5">
+                      {activeRoom.description || 'Hostel group chat · Tap Edit to add details'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditGroupName(activeRoom.name);
+                      setEditGroupDesc(activeRoom.description ?? '');
+                      setEditGroupAvatar(activeRoom.avatar);
+                      setEditingGroup(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] text-[11px] font-bold"
+                  >
+                    <PencilSimple weight="bold" className="w-3 h-3" />
+                    Edit Avatar &amp; Details
+                  </button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={handleSaveGroupDetails}
+                  className="space-y-3 pb-3 border-b border-slate-100"
+                >
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#59413c] uppercase tracking-wider mb-1.5">
+                      Group Avatar
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {GROUP_PRESET_AVATARS.map((url) => (
+                        <button
+                          key={url}
+                          type="button"
+                          onClick={() => setEditGroupAvatar(url)}
+                          className={`p-1 rounded-xl border-2 transition flex items-center justify-center ${
+                            editGroupAvatar === url
+                              ? 'border-[#a93017] bg-[#a93017]/5'
+                              : 'border-transparent hover:border-[#e0bfb8]/60 bg-[#f9f9ff]'
+                          }`}
+                        >
+                          <img src={url} alt="Group avatar" className="w-10 h-10 rounded-lg" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111c2d] mb-1">
+                      Group Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      minLength={2}
+                      maxLength={60}
+                      value={editGroupName}
+                      onChange={(e) => setEditGroupName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-xs text-[#111c2d]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111c2d] mb-1">
+                      Group Details
+                    </label>
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      value={editGroupDesc}
+                      onChange={(e) => setEditGroupDesc(e.target.value)}
+                      placeholder="What is this group about?"
+                      className="w-full px-3 py-2 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-xs text-[#111c2d] resize-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingGroup(false)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold text-[#59413c] hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingGroup}
+                      className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full bg-[#a93017] hover:bg-[#cb482c] text-white text-xs font-bold disabled:opacity-60"
+                    >
+                      {savingGroup && <CircleNotch className="w-3 h-3 animate-spin" />}
+                      Save
+                    </button>
+                  </div>
+                </form>
+              )}
+
               <div className="space-y-2">
+                <p className="text-[11px] font-bold text-[#59413c] uppercase tracking-wider">
+                  Members ({activeRoom.members.length})
+                </p>
                 {activeRoom.members.map((m) => {
                   const isMe = m.userId === user?.id;
                   const isCreator = activeRoom.createdBy === user?.id;
@@ -870,7 +1043,7 @@ export function ChatPage() {
                 onClick={() => navigate(`/app/chat/${room._id}`)}
                 className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center gap-3 active:scale-[0.99]"
               >
-                {room.type === 'GROUP' ? (
+                {room.type === 'GROUP' && !room.avatar ? (
                   <div className="w-11 h-11 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center shrink-0">
                     <UsersThree weight="duotone" className="w-6 h-6" />
                   </div>
@@ -908,7 +1081,7 @@ export function ChatPage() {
           <div className="fixed inset-0 z-50 bg-[#14241E]/50 backdrop-blur-xs flex items-center justify-center p-4">
             <form
               onSubmit={handleCreateGroup}
-              className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35"
+              className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-[#e0bfb8]/35 max-h-[88vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-extrabold text-[#111c2d] text-base">Create Group Chat</h3>
@@ -928,6 +1101,28 @@ export function ChatPage() {
               )}
 
               <div>
+                <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
+                  Choose Group Avatar
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {GROUP_PRESET_AVATARS.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => setGroupAvatar(url)}
+                      className={`p-1 rounded-xl border-2 transition flex items-center justify-center ${
+                        groupAvatar === url
+                          ? 'border-[#a93017] bg-[#a93017]/5'
+                          : 'border-transparent hover:border-[#e0bfb8]/60 bg-[#f9f9ff]'
+                      }`}
+                    >
+                      <img src={url} alt="Group avatar" className="w-10 h-10 rounded-lg" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-[#111c2d] mb-1">Group Name</label>
                 <input
                   type="text"
@@ -938,6 +1133,20 @@ export function ChatPage() {
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder="e.g., Sunset Fort Crew"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#111c2d] mb-1">
+                  Group Details (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  maxLength={200}
+                  value={groupDescription}
+                  onChange={(e) => setGroupDescription(e.target.value)}
+                  placeholder="e.g., Sunset hike & rooftop chai plans"
+                  className="w-full px-3.5 py-2 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-xs text-[#111c2d] resize-none"
                 />
               </div>
 

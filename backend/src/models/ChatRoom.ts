@@ -6,6 +6,8 @@ export interface IChatRoom extends Document {
   hostelId: Types.ObjectId;
   type: ChatRoomType;
   name: string | null;
+  description: string;
+  avatar: string | null;
   memberIds: Types.ObjectId[];
   createdBy: Types.ObjectId;
   lastMessageText: string;
@@ -20,6 +22,8 @@ const chatRoomSchema = new Schema<IChatRoom>(
     hostelId: { type: Schema.Types.ObjectId, ref: 'Hostel', required: true, index: true },
     type: { type: String, enum: ['DIRECT', 'GROUP'], required: true },
     name: { type: String, default: null, trim: true, maxlength: 60 },
+    description: { type: String, default: '', trim: true, maxlength: 200 },
+    avatar: { type: String, default: null, maxlength: 300 },
     memberIds: { type: [Schema.Types.ObjectId], ref: 'User', required: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     lastMessageText: { type: String, default: '' },

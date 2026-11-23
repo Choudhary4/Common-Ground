@@ -13,6 +13,17 @@ export const PRESET_AVATARS = [
   'https://api.dicebear.com/9.x/adventurer/svg?seed=Nisha&backgroundColor=ffdfbf',
 ];
 
+export const GROUP_PRESET_AVATARS = [
+  'https://api.dicebear.com/9.x/icons/svg?seed=Mountains&icon=compass&backgroundColor=b6e3f4',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Chai&icon=cup&backgroundColor=ffdfbf',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Music&icon=musicNoteBeamed&backgroundColor=c0aede',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Camera&icon=camera&backgroundColor=ffd5dc',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Sun&icon=sun&backgroundColor=fde68a',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Map&icon=geoAlt&backgroundColor=bbf7d0',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Games&icon=controller&backgroundColor=d1d4f9',
+  'https://api.dicebear.com/9.x/icons/svg?seed=Fire&icon=fire&backgroundColor=fecaca',
+];
+
 export function Avatar({
   src,
   name,

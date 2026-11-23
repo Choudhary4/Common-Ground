@@ -47,7 +47,8 @@ router.get('/rooms', async (req, res, next) => {
           _id: r._id,
           type: r.type,
           name: r.type === 'GROUP' ? r.name : (other?.nickname ?? 'Traveller'),
-          avatar: r.type === 'DIRECT' ? (other?.avatar ?? null) : null,
+          description: r.type === 'GROUP' ? (r.description ?? '') : '',
+          avatar: r.type === 'GROUP' ? (r.avatar ?? null) : (other?.avatar ?? null),
           createdBy: r.createdBy.toString(),
           members,
           lastMessageText: r.lastMessageText,
@@ -121,12 +122,14 @@ router.post('/rooms/direct', async (req, res, next) => {
 
 const createGroupSchema = z.object({
   name: z.string().trim().min(2, 'Group name is required').max(60),
+  description: z.string().trim().max(200).optional(),
+  avatar: z.string().url().max(300).nullable().optional(),
   memberIds: z.array(z.string().min(1)).min(1, 'Pick at least 1 traveller').max(30),
 });
 
 router.post('/rooms/group', async (req, res, next) => {
   try {
-    const { name, memberIds } = createGroupSchema.parse(req.body);
+    const { name, description, avatar, memberIds } = createGroupSchema.parse(req.body);
     const hostelId = req.auth!.hostelId!;
     const myId = req.auth!.userId;
 
@@ -148,6 +151,8 @@ router.post('/rooms/group', async (req, res, next) => {
       hostelId,
       type: 'GROUP',
       name,
+      description: description ?? '',
+      avatar: avatar ?? null,
       memberIds: validUsers.map((u) => u._id),
       createdBy: myId,
       lastMessageText: `${req.auth!.nickname} created the group`,
@@ -176,6 +181,51 @@ router.post('/rooms/group', async (req, res, next) => {
     }
 
     res.status(201).json({ roomId: room._id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const updateGroupSchema = z.object({
+  name: z.string().trim().min(2, 'Group name must be at least 2 characters').max(60).optional(),
+  description: z.string().trim().max(200).optional(),
+  avatar: z.string().url().max(300).nullable().optional(),
+});
+
+router.patch('/rooms/:roomId', async (req, res, next) => {
+  try {
+    const updates = updateGroupSchema.parse(req.body);
+    const hostelId = req.auth!.hostelId!;
+    const myId = req.auth!.userId;
+
+    const room = await ChatRoom.findOne({
+      _id: req.params.roomId,
+      hostelId,
+      type: 'GROUP',
+      memberIds: myId,
+    });
+    if (!room) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+
+    if (updates.name !== undefined) room.name = updates.name;
+    if (updates.description !== undefined) room.description = updates.description;
+    if (updates.avatar !== undefined) room.avatar = updates.avatar;
+    await room.save();
+
+    for (const memberId of room.memberIds) {
+      emitToUser(memberId.toString(), 'chat:room_updated', { roomId: room._id });
+    }
+
+    res.json({
+      room: {
+        _id: room._id,
+        name: room.name,
+        description: room.description,
+        avatar: room.avatar,
+      },
+    });
   } catch (err) {
     next(err);
   }
