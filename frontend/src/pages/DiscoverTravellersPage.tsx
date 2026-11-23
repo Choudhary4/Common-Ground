@@ -22,6 +22,7 @@ export function DiscoverTravellersPage() {
   const [selectedActivityId, setSelectedActivityId] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [vibeFilter, setVibeFilter] = useState<string>('ALL');
 
   const load = useCallback(async () => {
     try {
@@ -100,6 +101,27 @@ export function DiscoverTravellersPage() {
           </p>
         </div>
 
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {[
+            { key: 'ALL', label: 'All' },
+            { key: 'OPEN_TO_MEETING', label: 'Open to meeting' },
+            { key: 'UP_FOR_ACTIVITIES', label: 'Up for activities' },
+            { key: 'LOOKING_FOR_COMPANY', label: 'Looking for company' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setVibeFilter(f.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                vibeFilter === f.key
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         {feedback && (
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-medium text-amber-900">
             {feedback}
@@ -120,36 +142,50 @@ export function DiscoverTravellersPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {travellers.map((t) => (
+            {travellers
+              .filter((t) => vibeFilter === 'ALL' || t.status === vibeFilter)
+              .map((t) => {
+                const initials = t.nickname
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase();
+                return (
               <div
                 key={t.userId}
                 className="bg-white rounded-2xl border border-amber-200/80 p-4 flex items-start justify-between gap-3"
               >
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-slate-900 text-sm">{t.nickname}</h3>
-                    {t.status ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF0EC] text-[#D94E32]">
-                        {formatSocialStatus(t.status)}
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500">
-                        No vibe set
-                      </span>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#FFF0EC] text-[#D94E32] font-bold text-xs flex items-center justify-center shrink-0">
+                    {initials}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-slate-900 text-sm">{t.nickname}</h3>
+                      {t.status ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF0EC] text-[#D94E32]">
+                          {formatSocialStatus(t.status)}
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500">
+                          No vibe set
+                        </span>
+                      )}
+                    </div>
+                    {t.interests.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {t.interests.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {t.interests.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {t.interests.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -177,7 +213,8 @@ export function DiscoverTravellersPage() {
                   </button>
                 </div>
               </div>
-            ))}
+                );
+              })}
           </div>
         )}
 

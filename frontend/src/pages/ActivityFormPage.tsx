@@ -1,8 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { apiRequest, ApiError } from '../lib/api';
+
+const QUICK_TEMPLATES = [
+  {
+    label: '☕ Chai & Chat',
+    title: 'Chai & Conversations',
+    description: 'Grabbing masala chai in the common room—come say hi!',
+    category: 'SOCIAL',
+    meetingPoint: 'Common Room',
+    maxParticipants: 8,
+  },
+  {
+    label: '🃏 UNO / Cards',
+    title: 'UNO & Card Games',
+    description: 'Casual card games, beginners totally welcome!',
+    category: 'GAMES',
+    meetingPoint: 'Common Room',
+    maxParticipants: 6,
+  },
+  {
+    label: '🌅 Evening Walk',
+    title: 'Sunset / City Walk',
+    description: 'Exploring nearby streets and grabbing street snacks together.',
+    category: 'EXPLORATION',
+    meetingPoint: 'Reception Lobby',
+    maxParticipants: 6,
+  },
+  {
+    label: '🍛 Group Dinner',
+    title: 'Group Dinner Out',
+    description: 'Heading out to a local spot for dinner—anyone want to join?',
+    category: 'FOOD',
+    meetingPoint: 'Reception Lobby',
+    maxParticipants: 6,
+  },
+];
 
 function toLocalDateInput(d: Date) {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -120,9 +155,35 @@ export function ActivityFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <h1 className="text-xl font-extrabold text-slate-900 mb-1">
             {mode === 'edit' ? 'Edit Activity' : 'Create an Activity'}
           </h1>
-          <p className="text-xs text-slate-500 mb-5">
+          <p className="text-xs text-slate-500 mb-4">
             Keep it simple and welcoming—anyone at your hostel can see it.
           </p>
+
+          {mode === 'create' && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 mb-2">
+                <Sparkles className="w-3 h-3 text-[#E85D3F]" /> Quick 1-tap ideas
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.label}
+                    type="button"
+                    onClick={() => {
+                      setTitle(tpl.title);
+                      setDescription(tpl.description);
+                      setCategory(tpl.category);
+                      setMeetingPoint(tpl.meetingPoint);
+                      setMaxParticipants(tpl.maxParticipants);
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-[#FAF7F2] hover:bg-[#FFF0EC] border border-amber-200/80 hover:border-[#E85D3F]/40 text-xs font-semibold text-slate-700 transition active:scale-95"
+                  >
+                    {tpl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">

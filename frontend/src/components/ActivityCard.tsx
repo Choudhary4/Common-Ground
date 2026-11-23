@@ -1,5 +1,7 @@
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Users, Lock, Award } from 'lucide-react';
+import { Calendar, MapPin, Users, Lock, Award, Loader2 } from 'lucide-react';
+import { apiRequest } from '../lib/api';
 
 export interface ActivitySummary {
   _id: string;
@@ -20,8 +22,17 @@ export interface ActivitySummary {
   hasPendingRequest?: boolean;
 }
 
-export function ActivityCard({ activity }: { activity: ActivitySummary }) {
+export function ActivityCard({
+  activity,
+  onJoined,
+}: {
+  activity: ActivitySummary;
+  onJoined?: () => void;
+}) {
+  const [joining, setJoining] = useState(false);
+  const [quickJoined, setQuickJoined] = useState(false);
   const isOfficial = activity.creatorType === 'HOSTEL_MANAGER';
+  const spotsLeft = Math.max(0, activity.maxParticipants - activity.confirmedCount);
   const start = new Date(activity.scheduledAt);
   const timeLabel = start.toLocaleString([], {
     month: 'short',
@@ -29,6 +40,19 @@ export function ActivityCard({ activity }: { activity: ActivitySummary }) {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const handleQuickJoin = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setJoining(true);
+    try {
+      await apiRequest(`/activities/${activity._id}/join`, { method: 'POST' });
+      setQuickJoined(true);
+      onJoined?.();
+    } finally {
+      setJoining(false);
+    }
+  };
 
   const statusStyles: Record<string, string> = {
     OPEN: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -85,24 +109,36 @@ export function ActivityCard({ activity }: { activity: ActivitySummary }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
-        <span className="text-slate-500">
-          Hosted by <span className="font-semibold text-slate-800">{activity.creatorNickname}</span>
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs gap-2">
+        <span className="text-slate-500 truncate">
+          By <span className="font-semibold text-slate-800">{activity.creatorNickname}</span>
         </span>
-        <div className="flex items-center gap-2">
-          {activity.isJoined && (
-            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+        <div className="flex items-center gap-2 shrink-0">
+          {activity.isJoined || quickJoined ? (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
               You're in
             </span>
-          )}
-          {activity.hasPendingRequest && (
-            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
+          ) : activity.hasPendingRequest ? (
+            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">
               Pending
             </span>
-          )}
+          ) : activity.status === 'OPEN' && activity.joinMode === 'PUBLIC' && onJoined ? (
+            <button
+              type="button"
+              onClick={handleQuickJoin}
+              disabled={joining}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E85D3F] hover:bg-[#D94E32] active:scale-95 text-white font-semibold transition disabled:opacity-60"
+            >
+              {joining && <Loader2 className="w-3 h-3 animate-spin" />}
+              {joining ? 'Joining...' : 'Quick Join'}
+            </button>
+          ) : null}
           <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
             <Users className="w-3.5 h-3.5 text-slate-400" />
             {activity.confirmedCount}/{activity.maxParticipants}
+            {activity.status === 'OPEN' && spotsLeft === 1 && (
+              <span className="text-[10px] font-bold text-[#E85D3F]">(1 left)</span>
+            )}
           </span>
         </div>
       </div>

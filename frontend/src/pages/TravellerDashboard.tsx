@@ -170,7 +170,7 @@ export function TravellerDashboard() {
           ) : (
             <div className="space-y-3">
               {activities.map((a) => (
-                <ActivityCard key={a._id} activity={a} />
+                <ActivityCard key={a._id} activity={a} onJoined={loadData} />
               ))}
             </div>
           )}

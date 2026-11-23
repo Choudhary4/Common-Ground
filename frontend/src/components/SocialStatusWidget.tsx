@@ -58,14 +58,17 @@ export function SocialStatusWidget({
   const [optimisticStatus, setOptimisticStatus] = useState<SocialStatusValue | null>(currentStatus);
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(!currentStatus);
 
   useEffect(() => {
     setOptimisticStatus(currentStatus);
+    if (!currentStatus) setExpanded(true);
   }, [currentStatus]);
 
   const selectStatus = async (status: SocialStatusValue) => {
     const prev = optimisticStatus;
     setOptimisticStatus(status);
+    setExpanded(false);
     setBusy(true);
     try {
       await apiRequest('/traveller/status', {
@@ -83,6 +86,7 @@ export function SocialStatusWidget({
   const turnOff = async () => {
     const prev = optimisticStatus;
     setOptimisticStatus(null);
+    setExpanded(true);
     setBusy(true);
     try {
       await apiRequest('/traveller/status', { method: 'DELETE' });
@@ -93,6 +97,49 @@ export function SocialStatusWidget({
       setBusy(false);
     }
   };
+
+  if (optimisticStatus && !expanded) {
+    const activeOpt = SOCIAL_STATUS_OPTIONS.find((o) => o.value === optimisticStatus);
+    const ActiveIcon = activeOpt?.icon ?? Sparkles;
+    return (
+      <section className="bg-white rounded-2xl border border-[#E85D3F]/30 px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-8 h-8 rounded-xl bg-[#FFF0EC] text-[#E85D3F] flex items-center justify-center shrink-0">
+            <ActiveIcon className="w-4 h-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900 truncate">
+              Your vibe: {activeOpt?.label}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {openCount} {openCount === 1 ? 'traveller' : 'travellers'} active
+              {expiresAt
+                ? ` · until ${new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-900 text-xs font-semibold hover:bg-amber-100"
+          >
+            Change
+          </button>
+          <button
+            type="button"
+            onClick={turnOff}
+            disabled={busy}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            aria-label="Turn off vibe"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   if (dismissed && !optimisticStatus) {
     return (
