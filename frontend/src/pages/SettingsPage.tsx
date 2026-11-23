@@ -11,6 +11,7 @@ import {
   Prohibit,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
+import { Avatar, PRESET_AVATARS } from '../components/Avatar';
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -33,6 +34,7 @@ export function SettingsPage() {
   const { user, logout, refreshAuth } = useAuth();
   const navigate = useNavigate();
   const [nickname, setNickname] = useState('');
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [interestsText, setInterestsText] = useState('');
   const [blockedUsers, setBlockedUsers] = useState<Array<{ _id: string; nickname: string }>>([]);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -47,10 +49,12 @@ export function SettingsPage() {
   const load = async () => {
     const res = await apiRequest<{
       nickname: string;
+      avatar: string | null;
       interests: string[];
       blockedUsers: Array<{ _id: string; nickname: string }>;
     }>('/traveller/settings');
     setNickname(res.nickname);
+    setAvatar(res.avatar ?? null);
     setInterestsText(res.interests.join(', '));
     setBlockedUsers(res.blockedUsers);
   };
@@ -106,7 +110,7 @@ export function SettingsPage() {
       const interests = currentInterests.slice(0, 5);
       await apiRequest('/traveller/settings', {
         method: 'PATCH',
-        body: JSON.stringify({ nickname: nickname.trim(), interests }),
+        body: JSON.stringify({ nickname: nickname.trim(), avatar, interests }),
       });
       await refreshAuth();
       setSavedMsg('Profile preferences saved!');
@@ -169,9 +173,11 @@ export function SettingsPage() {
         {/* Profile Header Card */}
         <div className="rounded-2xl bg-[#14241E] text-white p-5 shadow-sm border border-emerald-500/20 flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-300 p-0.5 shrink-0">
-            <div className="w-full h-full rounded-[14px] bg-[#14241E] flex items-center justify-center text-lg font-extrabold text-emerald-200">
-              {initials}
-            </div>
+            <Avatar
+              src={avatar}
+              name={nickname || user?.nickname || initials}
+              className="w-full h-full rounded-[14px]"
+            />
           </div>
           <div className="min-w-0">
             <h1 className="text-lg font-extrabold truncate">{nickname || user?.nickname}</h1>
@@ -203,6 +209,29 @@ export function SettingsPage() {
               {savedMsg}
             </div>
           )}
+
+          <div>
+            <label className="block text-xs font-bold text-[#111c2d] mb-2">Choose Your Avatar</label>
+            <div className="grid grid-cols-6 gap-2">
+              {PRESET_AVATARS.map((url) => {
+                const selected = avatar === url;
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setAvatar(selected ? null : url)}
+                    className={`rounded-2xl p-0.5 transition active:scale-95 ${
+                      selected
+                        ? 'ring-2 ring-[#a93017] bg-[#ffdad3]/40'
+                        : 'hover:ring-2 hover:ring-slate-300'
+                    }`}
+                  >
+                    <img src={url} alt="Avatar option" className="w-full aspect-square rounded-xl" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-[#111c2d] mb-1.5">Nickname</label>

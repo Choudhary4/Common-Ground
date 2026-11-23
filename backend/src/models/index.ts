@@ -12,3 +12,5 @@ export * from './Notification.js';
 export * from './AuditLog.js';
 export * from './AnalyticsEvent.js';
 export * from './PushSubscription.js';
+export * from './ChatRoom.js';
+export * from './ChatMessage.js';

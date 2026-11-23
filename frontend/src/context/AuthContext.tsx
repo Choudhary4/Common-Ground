@@ -12,6 +12,7 @@ export interface AuthUser {
   hostelId: string | null;
   hostelName: string | null;
   hostelCity: string | null;
+  avatar?: string | null;
   interests?: string[];
 }
 

@@ -128,7 +128,7 @@ router.get('/discover', async (req, res, next) => {
       role: 'TRAVELLER',
       status: 'ACTIVE',
     })
-      .select('_id nickname interests createdAt')
+      .select('_id nickname avatar interests createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -153,6 +153,7 @@ router.get('/discover', async (req, res, next) => {
         return {
           userId: u._id,
           nickname: u.nickname,
+          avatar: u.avatar ?? null,
           interests: u.interests ?? [],
           status: s?.status ?? null,
           expiresAt: s?.expiresAt ?? null,
@@ -365,6 +366,7 @@ router.get('/settings', async (req, res, next) => {
       : [];
     res.json({
       nickname: user?.nickname ?? '',
+      avatar: user?.avatar ?? null,
       interests: user?.interests ?? [],
       blockedUsers,
     });
@@ -378,6 +380,7 @@ router.patch('/settings', async (req, res, next) => {
     const data = z
       .object({
         nickname: z.string().trim().min(2).max(40).optional(),
+        avatar: z.string().trim().max(200).nullable().optional(),
         interests: z.array(z.string().trim().min(1).max(24)).max(5).optional(),
       })
       .parse(req.body);
@@ -390,6 +393,7 @@ router.patch('/settings', async (req, res, next) => {
 
     res.json({
       nickname: updated?.nickname,
+      avatar: updated?.avatar ?? null,
       interests: updated?.interests ?? [],
     });
   } catch (err) {

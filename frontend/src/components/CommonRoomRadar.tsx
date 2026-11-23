@@ -15,11 +15,13 @@ import {
   formatSocialStatus,
   type SocialStatusValue,
 } from './SocialStatusWidget';
+import { Avatar } from './Avatar';
 import { apiRequest } from '../lib/api';
 
 export interface RadarTraveller {
   userId: string;
   nickname: string;
+  avatar?: string | null;
   status: SocialStatusValue | null;
 }
 
@@ -157,13 +159,14 @@ export function CommonRoomRadar({
                 isWarm ? 'border-amber-400/40' : 'border-white/25'
               } pl-1 pr-2.5 py-1 rounded-full shadow-md`}
             >
-              <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-1 ${
-                  isWarm ? 'bg-[#a93017] ring-amber-300' : 'bg-emerald-600 ring-emerald-300'
+              <Avatar
+                src={t.avatar}
+                name={t.nickname}
+                className={`w-6 h-6 rounded-full ring-1 ${
+                  isWarm ? 'ring-amber-300' : 'ring-emerald-300'
                 }`}
-              >
-                {initials}
-              </span>
+                bgClass={isWarm ? 'bg-[#a93017] text-white' : 'bg-emerald-600 text-white'}
+              />
               <span
                 className={`text-[10px] font-bold tracking-tight max-w-[78px] truncate ${
                   isWarm ? 'text-amber-200' : 'text-white'

@@ -141,7 +141,7 @@ router.get('/:id', async (req, res, next) => {
     const participantUsers = await User.find({
       _id: { $in: participants.map((p) => p.userId) },
     })
-      .select('_id nickname interests')
+      .select('_id nickname avatar interests')
       .lean();
     const pMap = new Map(participantUsers.map((u) => [u._id.toString(), u]));
 
@@ -186,6 +186,7 @@ router.get('/:id', async (req, res, next) => {
       participants: participants.map((p) => ({
         userId: p.userId,
         nickname: pMap.get(p.userId.toString())?.nickname ?? 'Traveller',
+        avatar: pMap.get(p.userId.toString())?.avatar ?? null,
         interests: pMap.get(p.userId.toString())?.interests ?? [],
         joinedAt: p.joinedAt,
         isHost: p.userId.toString() === activity.creatorId.toString(),

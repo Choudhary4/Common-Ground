@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Broadcast,
   UsersThree,
+  ChatCircleDots,
   PlusCircle,
   CalendarCheck,
   Bell,
@@ -13,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { enablePushNotifications, getVapidPublicKey, isPushSupported } from '../lib/push';
+import { Avatar } from './Avatar';
 import { Footer } from './Footer';
 
 export function TravellerLayout({ children }: { children: React.ReactNode }) {
@@ -112,9 +114,10 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { to: '/app', label: 'Radar', icon: Broadcast },
-    { to: '/app/discover', label: 'Travellers', icon: UsersThree },
+    { to: '/app/discover', label: 'People', icon: UsersThree },
+    { to: '/app/chat', label: 'Chat', icon: ChatCircleDots },
     { to: '/app/activities/new', label: 'Host', icon: PlusCircle },
-    { to: '/app/my-activities', label: 'My Plans', icon: CalendarCheck },
+    { to: '/app/my-activities', label: 'Plans', icon: CalendarCheck },
   ];
 
   const initials = (user?.nickname ?? 'CG')
@@ -157,11 +160,15 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
             </button>
             <button
               onClick={() => navigate('/app/settings')}
-              className="relative w-9 h-9 rounded-full bg-[#14241E] text-emerald-100 font-bold text-xs flex items-center justify-center ring-2 ring-emerald-500/30 shadow-sm"
+              className="relative rounded-full ring-2 ring-emerald-500/30 shadow-sm"
               aria-label="Profile & Settings"
               title={user?.nickname}
             >
-              {initials}
+              <Avatar
+                src={user?.avatar}
+                name={user?.nickname ?? initials}
+                className="w-9 h-9 rounded-full"
+              />
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
             </button>
           </div>
@@ -206,12 +213,15 @@ export function TravellerLayout({ children }: { children: React.ReactNode }) {
         <div className="bg-[#14241E]/95 backdrop-blur-xl border border-emerald-500/20 text-white rounded-full px-3 py-2 shadow-2xl flex items-center justify-around">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = location.pathname === item.to;
+            const active =
+              item.to === '/app'
+                ? location.pathname === '/app'
+                : location.pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center justify-center relative py-1 px-3 transition-all ${
+                className={`flex flex-col items-center justify-center relative py-1 px-2 transition-all ${
                   active ? 'text-emerald-400' : 'text-emerald-100/65 hover:text-white'
                 }`}
               >

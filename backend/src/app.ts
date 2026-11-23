@@ -12,6 +12,7 @@ import activityRoutes from './routes/activityRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import managerRoutes from './routes/managerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ export function createApp() {
   app.use('/api/staff', staffRoutes);
   app.use('/api/manager', managerRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/chat', chatRoutes);
 
   app.use(errorHandler);
   return app;

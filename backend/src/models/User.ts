@@ -10,6 +10,7 @@ export interface IUser extends Document {
   role: UserRole;
   hostelId: Types.ObjectId | null;
   status: UserStatus;
+  avatar?: string | null;
   interests: string[];
   blockedUserIds: Types.ObjectId[];
   isDemo: boolean;
@@ -29,6 +30,7 @@ const userSchema = new Schema<IUser>(
     },
     hostelId: { type: Schema.Types.ObjectId, ref: 'Hostel', default: null, index: true },
     status: { type: String, enum: ['ACTIVE', 'RESTRICTED', 'DISABLED'], default: 'ACTIVE', index: true },
+    avatar: { type: String, default: null, maxlength: 200 },
     interests: { type: [String], default: [] },
     blockedUserIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     isDemo: { type: Boolean, default: false, index: true },

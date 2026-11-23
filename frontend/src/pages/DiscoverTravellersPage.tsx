@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   PaperPlaneTilt,
+  ChatCircleDots,
   Flag,
   Prohibit,
   CircleNotch,
@@ -13,6 +15,7 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
+import { Avatar } from '../components/Avatar';
 import { formatSocialStatus, type SocialStatusValue } from '../components/SocialStatusWidget';
 import { type ActivitySummary } from '../components/ActivityCard';
 import { apiRequest, ApiError } from '../lib/api';
@@ -21,6 +24,7 @@ import { getSocket } from '../lib/socket';
 interface OptedInTraveller {
   userId: string;
   nickname: string;
+  avatar?: string | null;
   interests: string[];
   status: SocialStatusValue | null;
   expiresAt: string | null;
@@ -58,10 +62,12 @@ function getVibeBadgeStyle(status: SocialStatusValue | null) {
 }
 
 export function DiscoverTravellersPage() {
+  const navigate = useNavigate();
   const [travellers, setTravellers] = useState<OptedInTraveller[]>([]);
   const [myOpenActivities, setMyOpenActivities] = useState<ActivitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const [startingChatId, setStartingChatId] = useState<string | null>(null);
 
   // Modals
   const [inviteTarget, setInviteTarget] = useState<OptedInTraveller | null>(null);
@@ -154,6 +160,21 @@ export function DiscoverTravellersPage() {
       setFeedback(err instanceof ApiError ? err.message : 'Could not cancel invite');
     } finally {
       setCancellingInviteId(null);
+    }
+  };
+
+  const startDirectChat = async (targetUserId: string) => {
+    setStartingChatId(targetUserId);
+    try {
+      const res = await apiRequest<{ roomId: string }>('/chat/rooms/direct', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      });
+      navigate(`/app/chat/${res.roomId}`);
+    } catch (err) {
+      setFeedback(err instanceof ApiError ? err.message : 'Could not open chat');
+    } finally {
+      setStartingChatId(null);
     }
   };
 
@@ -289,13 +310,12 @@ export function DiscoverTravellersPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="relative shrink-0">
-                        <div
-                          className={`w-11 h-11 rounded-2xl font-extrabold text-xs flex items-center justify-center text-white shadow-xs ${
-                            isWarm ? 'bg-[#a93017]' : 'bg-[#14241E]'
-                          }`}
-                        >
-                          {initials}
-                        </div>
+                        <Avatar
+                          src={t.avatar}
+                          name={t.nickname}
+                          className="w-11 h-11 rounded-2xl shadow-xs"
+                          bgClass={isWarm ? 'bg-[#a93017] text-white' : 'bg-[#14241E] text-white'}
+                        />
                         {t.status && (
                           <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
                         )}
@@ -328,6 +348,19 @@ export function DiscoverTravellersPage() {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startDirectChat(t.userId)}
+                        disabled={startingChatId === t.userId}
+                        title="Chat"
+                        className="p-2 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#14241E] transition active:scale-95 disabled:opacity-60"
+                      >
+                        {startingChatId === t.userId ? (
+                          <CircleNotch className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ChatCircleDots weight="duotone" className="w-4 h-4" />
+                        )}
+                      </button>
                       {myOpenActivities.length > 0 &&
                         (isInvited ? (
                           <button

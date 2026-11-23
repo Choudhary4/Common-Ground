@@ -156,6 +156,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         hostelId: user.hostelId,
         hostelName: hostel?.name ?? null,
         hostelCity: hostel?.city ?? null,
+        avatar: user.avatar ?? null,
         interests: user.interests ?? [],
       },
     });

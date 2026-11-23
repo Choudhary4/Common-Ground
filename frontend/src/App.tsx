@@ -10,6 +10,7 @@ import { ActivityDetailPage } from './pages/ActivityDetailPage';
 import { MyActivitiesPage } from './pages/MyActivitiesPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ChatPage } from './pages/ChatPage';
 import { StaffLoginPage } from './pages/StaffLoginPage';
 import { StaffDashboardPage } from './pages/StaffDashboardPage';
 import { ManagerDashboardPage } from './pages/ManagerDashboardPage';
@@ -109,6 +110,22 @@ export function App() {
             element={
               <ProtectedRoute allowedRoles={['TRAVELLER', 'HOSTEL_MANAGER']}>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/chat"
+            element={
+              <ProtectedRoute allowedRoles={['TRAVELLER', 'HOSTEL_MANAGER']}>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/chat/:roomId"
+            element={
+              <ProtectedRoute allowedRoles={['TRAVELLER', 'HOSTEL_MANAGER']}>
+                <ChatPage />
               </ProtectedRoute>
             }
           />
