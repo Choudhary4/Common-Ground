@@ -14,12 +14,13 @@ const travellerOnboardSchema = z.object({
   qrToken: z.string().min(10),
   nickname: z.string().trim().min(2, 'Nickname must be at least 2 characters').max(40),
   accessCode: z.string().trim().min(4, 'Access code is required').max(20),
+  avatar: z.string().trim().max(300).nullable().optional(),
   interests: z.array(z.string().trim().min(1).max(24)).max(5).optional(),
 });
 
 router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
   try {
-    const { qrToken, nickname, accessCode, interests } = travellerOnboardSchema.parse(req.body);
+    const { qrToken, nickname, accessCode, avatar, interests } = travellerOnboardSchema.parse(req.body);
 
     const qr = await HostelQR.findOne({ tokenHash: hashToken(qrToken), status: 'ACTIVE' });
     if (!qr) {
@@ -48,6 +49,7 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
 
     const user = await User.create({
       nickname,
+      avatar: avatar ?? null,
       role: 'TRAVELLER',
       hostelId: hostel._id,
       interests: interests ?? [],
@@ -69,6 +71,7 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
       user: {
         id: user._id,
         nickname: user.nickname,
+        avatar: user.avatar ?? null,
         role: user.role,
         hostelId: hostel._id,
         hostelName: hostel.name,
