@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Types } from 'mongoose';
-import { Hostel, User, Activity, AnalyticsEvent } from '../models/index.js';
+import { Hostel, User, Activity, AnalyticsEvent, AuditLog } from '../models/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { hashPassword } from '../utils/crypto.js';
@@ -12,32 +12,61 @@ router.use(authenticate, requireRole('CENTRAL_ADMIN'));
 
 router.get('/overview', async (_req, res, next) => {
   try {
-    const [hostels, hostelCount, managerCount, staffCount, realTravellers, realActivities, events, perHostelEvents, perHostelTravellers] =
-      await Promise.all([
-        Hostel.find().select('_id name city isDemo').lean(),
-        Hostel.countDocuments({ status: 'ACTIVE' }),
-        User.countDocuments({ role: 'HOSTEL_MANAGER', status: 'ACTIVE' }),
-        User.countDocuments({ role: 'HOSTEL_STAFF', status: 'ACTIVE' }),
-        User.countDocuments({ role: 'TRAVELLER', isDemo: false }),
-        Activity.countDocuments({ isDemo: false }),
-        AnalyticsEvent.aggregate([
-          { $match: { isDemo: false } },
-          { $group: { _id: '$eventType', count: { $sum: 1 } } },
-        ]),
-        AnalyticsEvent.aggregate([
-          { $match: { isDemo: false } },
-          { $group: { _id: { hostelId: '$hostelId', eventType: '$eventType' }, count: { $sum: 1 } } },
-        ]),
-        User.aggregate([
-          { $match: { role: 'TRAVELLER', isDemo: false, hostelId: { $ne: null } } },
-          { $group: { _id: '$hostelId', count: { $sum: 1 } } },
-        ]),
-      ]);
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const [
+      hostels,
+      hostelCount,
+      managerCount,
+      staffCount,
+      realTravellers,
+      realActivities,
+      events,
+      perHostelEvents,
+      perHostelTravellers,
+      thisWeekEvents,
+      lastWeekEvents,
+    ] = await Promise.all([
+      Hostel.find().select('_id name city status isDemo').lean(),
+      Hostel.countDocuments({ status: 'ACTIVE' }),
+      User.countDocuments({ role: 'HOSTEL_MANAGER', status: 'ACTIVE' }),
+      User.countDocuments({ role: 'HOSTEL_STAFF', status: 'ACTIVE' }),
+      User.countDocuments({ role: 'TRAVELLER', isDemo: false }),
+      Activity.countDocuments({ isDemo: false }),
+      AnalyticsEvent.aggregate([
+        { $match: { isDemo: false } },
+        { $group: { _id: '$eventType', count: { $sum: 1 } } },
+      ]),
+      AnalyticsEvent.aggregate([
+        { $match: { isDemo: false } },
+        { $group: { _id: { hostelId: '$hostelId', eventType: '$eventType' }, count: { $sum: 1 } } },
+      ]),
+      User.aggregate([
+        { $match: { role: 'TRAVELLER', isDemo: false, hostelId: { $ne: null } } },
+        { $group: { _id: '$hostelId', count: { $sum: 1 } } },
+      ]),
+      AnalyticsEvent.aggregate([
+        { $match: { isDemo: false, createdAt: { $gte: sevenDaysAgo } } },
+        { $group: { _id: '$hostelId', count: { $sum: 1 } } },
+      ]),
+      AnalyticsEvent.aggregate([
+        { $match: { isDemo: false, createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
+        { $group: { _id: '$hostelId', count: { $sum: 1 } } },
+      ]),
+    ]);
 
     const eventCounts: Record<string, number> = {};
     for (const e of events) eventCounts[e._id] = e.count;
 
     const travellerMap = new Map(perHostelTravellers.map((t) => [t._id.toString(), t.count as number]));
+    const thisWeekMap = new Map(
+      thisWeekEvents.filter((e) => e._id).map((e) => [e._id.toString(), e.count as number])
+    );
+    const lastWeekMap = new Map(
+      lastWeekEvents.filter((e) => e._id).map((e) => [e._id.toString(), e.count as number])
+    );
     const hostelEventMap = new Map<string, Record<string, number>>();
     for (const item of perHostelEvents) {
       const hId = item._id.hostelId?.toString();
@@ -47,17 +76,21 @@ router.get('/overview', async (_req, res, next) => {
     }
 
     const hostelBreakdown = hostels.map((h) => {
-      const ev = hostelEventMap.get(h._id.toString()) ?? {};
+      const hid = h._id.toString();
+      const ev = hostelEventMap.get(hid) ?? {};
       return {
         hostelId: h._id,
         name: h.name,
         city: h.city,
+        status: h.status,
         isDemo: h.isDemo,
         qrScans: ev.QR_SCAN ?? 0,
-        travellersOnboarded: travellerMap.get(h._id.toString()) ?? 0,
+        travellersOnboarded: travellerMap.get(hid) ?? 0,
         activitiesCreated: ev.ACTIVITY_CREATED ?? 0,
         activitiesJoined: ev.ACTIVITY_JOINED ?? 0,
         activitiesCompleted: ev.ACTIVITY_COMPLETED ?? 0,
+        thisWeekEvents: thisWeekMap.get(hid) ?? 0,
+        lastWeekEvents: lastWeekMap.get(hid) ?? 0,
       };
     });
 
@@ -256,6 +289,37 @@ router.patch('/staff/:id', async (req, res, next) => {
       return;
     }
     res.json({ staff: user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/audit', async (_req, res, next) => {
+  try {
+    const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(50).lean();
+    const actorIds = [...new Set(logs.map((l) => l.actorId?.toString()).filter(Boolean))];
+    const hostelIds = [...new Set(logs.map((l) => l.hostelId?.toString()).filter(Boolean))];
+    const [actors, hostels] = await Promise.all([
+      User.find({ _id: { $in: actorIds } }).select('_id nickname email').lean(),
+      Hostel.find({ _id: { $in: hostelIds } }).select('_id name').lean(),
+    ]);
+    const aMap = new Map(actors.map((a) => [a._id.toString(), a]));
+    const hMap = new Map(hostels.map((h) => [h._id.toString(), h.name]));
+
+    res.json({
+      logs: logs.map((l) => {
+        const actor = l.actorId ? aMap.get(l.actorId.toString()) : null;
+        return {
+          _id: l._id,
+          action: l.action,
+          actorRole: l.actorRole,
+          actorName: actor?.nickname ?? 'System',
+          hostelName: l.hostelId ? (hMap.get(l.hostelId.toString()) ?? null) : null,
+          targetType: l.targetType,
+          createdAt: l.createdAt,
+        };
+      }),
+    });
   } catch (err) {
     next(err);
   }
