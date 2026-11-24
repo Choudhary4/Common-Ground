@@ -13,7 +13,8 @@ export type NotificationType =
   | 'ACTIVITY_INVITE'
   | 'HOST_TRANSFERRED'
   | 'GROUP_ADDED'
-  | 'GROUP_REMOVED';
+  | 'GROUP_REMOVED'
+  | 'LOBBY_BROADCAST';
 
 export interface INotification extends Document {
   userId: Types.ObjectId;

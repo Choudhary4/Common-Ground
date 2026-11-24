@@ -27,6 +27,9 @@ import {
   X,
   List,
   WarningCircle,
+  Megaphone,
+  PaperPlaneTilt,
+  Trash,
 } from '@phosphor-icons/react';
 import { apiRequest, ApiError } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -86,6 +89,30 @@ interface AccessCodeData {
   createdAt: string;
 }
 
+interface BroadcastItem {
+  _id: string;
+  title: string;
+  message: string;
+  active: boolean;
+  expiresAt: string;
+  createdAt: string;
+}
+
+const BROADCAST_TEMPLATES = [
+  {
+    title: 'Bonfire on the Terrace!',
+    message: 'Bonfire & acoustic jam starting on the terrace in 15 mins — come join!',
+  },
+  {
+    title: 'Masala Chai Ready',
+    message: 'Fresh masala chai & snacks are up in the common room right now!',
+  },
+  {
+    title: 'Quiet Hours at 11 PM',
+    message: 'Friendly reminder: dorm quiet hours start at 11 PM. Terrace stays open for low-voice chats.',
+  },
+];
+
 type ManagerSection = 'overview' | 'plans' | 'official' | 'reports' | 'qr';
 type PlanFilter = 'ALL' | 'OFFICIAL' | 'GUEST';
 
@@ -124,6 +151,13 @@ export function ManagerDashboardPage() {
   const [reports, setReports] = useState<ManagerReport[]>([]);
   const [qr, setQr] = useState<QrData | null>(null);
   const [accessCode, setAccessCode] = useState<AccessCodeData | null>(null);
+  const [broadcasts, setBroadcasts] = useState<BroadcastItem[]>([]);
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [broadcastHours, setBroadcastHours] = useState(6);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [clearingBroadcastId, setClearingBroadcastId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
@@ -153,19 +187,59 @@ export function ManagerDashboardPage() {
   >(null);
 
   const loadAll = useCallback(async () => {
-    const [ov, actRes, repRes, qrRes, codeRes] = await Promise.all([
+    const [ov, actRes, repRes, qrRes, codeRes, bcRes] = await Promise.all([
       apiRequest<ManagerOverview>('/manager/overview'),
       apiRequest<{ activities: ManagerActivity[] }>('/manager/activities'),
       apiRequest<{ reports: ManagerReport[] }>('/manager/reports'),
       apiRequest<{ qr: QrData | null }>('/staff/qr'),
       apiRequest<{ accessCode: AccessCodeData | null }>('/staff/access-code'),
+      apiRequest<{ broadcasts: BroadcastItem[] }>('/manager/broadcasts').catch(() => ({
+        broadcasts: [],
+      })),
     ]);
     setOverview(ov);
     setActivities(actRes.activities);
     setReports(repRes.reports);
     setQr(qrRes.qr);
     setAccessCode(codeRes.accessCode);
+    setBroadcasts(bcRes.broadcasts);
   }, []);
+
+  const sendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSendingBroadcast(true);
+    try {
+      const res = await apiRequest<{ recipientsCount: number }>('/manager/broadcasts', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: broadcastTitle.trim(),
+          message: broadcastMsg.trim(),
+          durationHours: broadcastHours,
+        }),
+      });
+      setBroadcastTitle('');
+      setBroadcastMsg('');
+      setBroadcastModalOpen(false);
+      showToast(`Broadcast sent live to ${res.recipientsCount} active traveller(s)!`);
+      await loadAll();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'Failed to send broadcast');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const clearBroadcast = async (id: string) => {
+    setClearingBroadcastId(id);
+    try {
+      await apiRequest(`/manager/broadcasts/${id}`, { method: 'DELETE' });
+      showToast('Lobby notice cleared.');
+      await loadAll();
+    } finally {
+      setClearingBroadcastId(null);
+    }
+  };
 
   useEffect(() => {
     void loadAll();
@@ -563,6 +637,18 @@ export function ManagerDashboardPage() {
               type="button"
               onClick={() => {
                 setFormError(null);
+                setBroadcastModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#062018] hover:bg-[#14241E] text-emerald-300 text-xs font-bold shadow-xs transition active:scale-95"
+            >
+              <Megaphone weight="duotone" className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Broadcast</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setFormError(null);
                 setCreateModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#a93017] hover:bg-[#cb482c] text-white text-xs font-bold shadow-xs transition active:scale-95"
@@ -842,6 +928,71 @@ export function ManagerDashboardPage() {
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Lobby Broadcast Quick Card */}
+                  <div className="bg-white rounded-3xl border border-[#e0bfb8]/30 p-5 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-extrabold text-[#111c2d] flex items-center gap-1.5">
+                        <Megaphone weight="duotone" className="w-4 h-4 text-[#a93017]" />
+                        Lobby Broadcast
+                      </h3>
+                      {broadcasts.some(
+                        (b) => b.active && new Date(b.expiresAt).getTime() > Date.now()
+                      ) && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#ccf5e7] text-[#0b6b52] text-[10px] font-extrabold">
+                          Live
+                        </span>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const activeBc = broadcasts.find(
+                        (b) => b.active && new Date(b.expiresAt).getTime() > Date.now()
+                      );
+                      if (!activeBc) {
+                        return (
+                          <p className="text-xs text-[#59413c]">
+                            Pin an instant announcement banner + push alert to all checked-in guests.
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="p-3 rounded-2xl bg-[#a93017]/5 border border-[#a93017]/20 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-extrabold text-[#111c2d]">{activeBc.title}</p>
+                            <button
+                              type="button"
+                              onClick={() => clearBroadcast(activeBc._id)}
+                              disabled={clearingBroadcastId === activeBc._id}
+                              className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 shrink-0"
+                              title="Clear active banner"
+                            >
+                              {clearingBroadcastId === activeBc._id ? (
+                                <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash weight="duotone" className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-[#59413c] leading-relaxed">
+                            {activeBc.message}
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormError(null);
+                        setBroadcastModalOpen(true);
+                      }}
+                      className="w-full py-2.5 rounded-full bg-[#a93017] hover:bg-[#cb482c] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition"
+                    >
+                      <PaperPlaneTilt weight="fill" className="w-3.5 h-3.5" />
+                      Broadcast Notice to Lobby
+                    </button>
                   </div>
 
                   {/* Community Alerts Card */}
@@ -1405,6 +1556,142 @@ export function ManagerDashboardPage() {
               >
                 {creatingActivity && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
                 {creatingActivity ? 'Publishing...' : 'Publish Official Event'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Lobby Broadcast Modal */}
+      {broadcastModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-[#062018]/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setBroadcastModalOpen(false)}
+        >
+          <form
+            onSubmit={sendBroadcast}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl border border-[#e0bfb8]/35 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#ffdad3]/60 text-[#a93017] flex items-center justify-center">
+                  <Megaphone weight="duotone" className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#111c2d]">
+                    Send Lobby Broadcast
+                  </h3>
+                  <p className="text-[11px] text-[#59413c]">
+                    Live Radar banner + mobile push to all active guests
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBroadcastModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X weight="bold" className="w-4 h-4" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
+                {formError}
+              </div>
+            )}
+
+            {/* Quick Templates */}
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#59413c] mb-1.5">
+                Quick Templates
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {BROADCAST_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.title}
+                    type="button"
+                    onClick={() => {
+                      setBroadcastTitle(tpl.title);
+                      setBroadcastMsg(tpl.message);
+                    }}
+                    className="px-2.5 py-1 rounded-full bg-[#f0f3ff] hover:bg-[#e7eeff] text-[#111c2d] text-[11px] font-bold transition"
+                  >
+                    {tpl.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111c2d] mb-1">Notice Title</label>
+              <input
+                required
+                minLength={3}
+                maxLength={80}
+                value={broadcastTitle}
+                onChange={(e) => setBroadcastTitle(e.target.value)}
+                placeholder="e.g., Bonfire starting on terrace at 9 PM!"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111c2d] mb-1">Message</label>
+              <textarea
+                required
+                minLength={5}
+                maxLength={240}
+                rows={3}
+                value={broadcastMsg}
+                onChange={(e) => setBroadcastMsg(e.target.value)}
+                placeholder="Add details for travellers..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f9f9ff] border border-[#e0bfb8]/50 text-sm text-[#111c2d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111c2d] mb-1.5">
+                Pin Duration on Radar
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[2, 6, 12].map((hrs) => (
+                  <button
+                    key={hrs}
+                    type="button"
+                    onClick={() => setBroadcastHours(hrs)}
+                    className={`py-2 rounded-xl text-xs font-bold border transition ${
+                      broadcastHours === hrs
+                        ? 'bg-[#062018] text-emerald-300 border-[#062018]'
+                        : 'bg-[#f9f9ff] text-[#59413c] border-[#e0bfb8]/40'
+                    }`}
+                  >
+                    {hrs} Hours
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setBroadcastModalOpen(false)}
+                className="px-4 py-2 rounded-full text-xs font-bold text-[#59413c] hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={sendingBroadcast}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-[#a93017] hover:bg-[#cb482c] text-white text-xs font-bold disabled:opacity-60"
+              >
+                {sendingBroadcast ? (
+                  <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <PaperPlaneTilt weight="fill" className="w-3.5 h-3.5" />
+                )}
+                {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
               </button>
             </div>
           </form>

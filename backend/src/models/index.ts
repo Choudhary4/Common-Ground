@@ -14,3 +14,4 @@ export * from './AnalyticsEvent.js';
 export * from './PushSubscription.js';
 export * from './ChatRoom.js';
 export * from './ChatMessage.js';
+export * from './Broadcast.js';

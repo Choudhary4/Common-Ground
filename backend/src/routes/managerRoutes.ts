@@ -7,11 +7,14 @@ import {
   Session,
   AnalyticsEvent,
   Hostel,
+  Broadcast,
+  Notification,
 } from '../models/index.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireHostelScope, requireRole } from '../middleware/rbac.js';
 import { recordAuditLog } from '../services/auditService.js';
-import { emitToHostel } from '../services/socketService.js';
+import { emitToHostel, emitToUser } from '../services/socketService.js';
+import { sendPushToUser } from '../services/pushService.js';
 
 const router = Router();
 router.use(authenticate, requireHostelScope, requireRole('HOSTEL_MANAGER'));
@@ -196,6 +199,115 @@ router.patch('/reports/:id', async (req, res, next) => {
     });
 
     res.json({ report });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const createBroadcastSchema = z.object({
+  title: z.string().trim().min(3, 'Title is required').max(80),
+  message: z.string().trim().min(5, 'Message is required').max(240),
+  durationHours: z.number().min(1).max(24).optional().default(6),
+});
+
+router.get('/broadcasts', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const broadcasts = await Broadcast.find({ hostelId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    res.json({ broadcasts });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/broadcasts', async (req, res, next) => {
+  try {
+    const { title, message, durationHours } = createBroadcastSchema.parse(req.body);
+    const hostelId = req.auth!.hostelId!;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+
+    // Deactivate previous active banners so the new notice takes center stage
+    await Broadcast.updateMany({ hostelId, active: true }, { $set: { active: false } });
+
+    const broadcast = await Broadcast.create({
+      hostelId,
+      createdBy: req.auth!.userId,
+      senderNickname: req.auth!.nickname || 'Hostel Team',
+      title,
+      message,
+      active: true,
+      expiresAt,
+    });
+
+    emitToHostel(hostelId.toString(), 'broadcast:new', { broadcast });
+
+    // Notify & push to all active checked-in travellers in this hostel
+    const activeUserIds = await Session.distinct('userId', {
+      hostelId,
+      revokedAt: null,
+      expiresAt: { $gt: now },
+    });
+
+    const travellers = await User.find({
+      _id: { $in: activeUserIds },
+      hostelId,
+      role: 'TRAVELLER',
+      status: 'ACTIVE',
+    })
+      .select('_id')
+      .lean();
+
+    for (const t of travellers) {
+      const notif = await Notification.create({
+        userId: t._id,
+        hostelId,
+        type: 'LOBBY_BROADCAST',
+        title: `Hostel Notice: ${title}`,
+        message,
+        referenceId: broadcast._id,
+      });
+      emitToUser(t._id.toString(), 'notification:new', notif);
+      void sendPushToUser(t._id, {
+        title: `Hostel Notice: ${title}`,
+        body: message,
+        url: '/app',
+      });
+    }
+
+    await recordAuditLog({
+      actorId: req.auth!.userId,
+      actorRole: req.auth!.role,
+      hostelId,
+      action: 'LOBBY_BROADCAST_SENT',
+      targetType: 'Broadcast',
+      targetId: broadcast._id.toString(),
+      metadata: { recipients: travellers.length },
+    });
+
+    res.status(201).json({ broadcast, recipientsCount: travellers.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/broadcasts/:id', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const updated = await Broadcast.findOneAndUpdate(
+      { _id: req.params.id, hostelId },
+      { $set: { active: false } },
+      { new: true }
+    );
+    if (!updated) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    emitToHostel(hostelId.toString(), 'broadcast:cleared', { broadcastId: updated._id });
+    res.json({ message: 'Broadcast cleared' });
   } catch (err) {
     next(err);
   }

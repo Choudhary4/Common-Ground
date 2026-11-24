@@ -10,6 +10,7 @@ import {
   Report,
   AnalyticsEvent,
   PushSubscription,
+  Broadcast,
 } from '../models/index.js';
 import { env } from '../config/env.js';
 import { authenticate } from '../middleware/auth.js';
@@ -556,6 +557,22 @@ router.post('/push/test', async (req, res, next) => {
       url: '/app/notifications',
     });
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/broadcast', async (req, res, next) => {
+  try {
+    const hostelId = req.auth!.hostelId!;
+    const broadcast = await Broadcast.findOne({
+      hostelId,
+      active: true,
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ broadcast: broadcast ?? null });
   } catch (err) {
     next(err);
   }

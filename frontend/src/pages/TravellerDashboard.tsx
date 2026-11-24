@@ -10,6 +10,8 @@ import {
   Compass,
   ForkKnife,
   SquaresFour,
+  Megaphone,
+  X,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { type SocialStatusValue } from '../components/SocialStatusWidget';
@@ -28,6 +30,14 @@ const FILTER_CHIPS = [
   { key: 'all', category: 'FOOD', label: 'Food', icon: ForkKnife },
 ];
 
+interface LobbyBroadcast {
+  _id: string;
+  title: string;
+  message: string;
+  senderNickname: string;
+  createdAt: string;
+}
+
 export function TravellerDashboard() {
   const { user } = useAuth();
   const [statusDoc, setStatusDoc] = useState<{ status: SocialStatusValue; expiresAt: string } | null>(
@@ -35,6 +45,8 @@ export function TravellerDashboard() {
   );
   const [radarTravellers, setRadarTravellers] = useState<RadarTraveller[]>([]);
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
+  const [broadcast, setBroadcast] = useState<LobbyBroadcast | null>(null);
+  const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string | null>(null);
   const [activeChipIdx, setActiveChipIdx] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +54,7 @@ export function TravellerDashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [statusRes, discoverRes, actRes] = await Promise.all([
+      const [statusRes, discoverRes, actRes, broadcastRes] = await Promise.all([
         apiRequest<{ status: { status: SocialStatusValue; expiresAt: string } | null }>(
           '/traveller/status'
         ),
@@ -50,10 +62,14 @@ export function TravellerDashboard() {
         apiRequest<{ activities: ActivitySummary[] }>(
           `/activities?filter=${activeChip.key}&category=${activeChip.category}`
         ),
+        apiRequest<{ broadcast: LobbyBroadcast | null }>('/traveller/broadcast').catch(() => ({
+          broadcast: null,
+        })),
       ]);
       setStatusDoc(statusRes.status);
       setRadarTravellers(discoverRes.travellers);
       setActivities(actRes.activities);
+      setBroadcast(broadcastRes.broadcast);
     } finally {
       setLoading(false);
     }
@@ -66,6 +82,16 @@ export function TravellerDashboard() {
   useEffect(() => {
     const socket = getSocket();
     const refresh = () => void loadData();
+    const onBroadcastNew = (payload?: { broadcast?: LobbyBroadcast }) => {
+      if (payload?.broadcast) {
+        setBroadcast(payload.broadcast);
+        setDismissedBroadcastId(null);
+      }
+    };
+    const onBroadcastCleared = () => {
+      setBroadcast(null);
+    };
+
     socket.on('activity:created', refresh);
     socket.on('activity:updated', refresh);
     socket.on('activity:cancelled', refresh);
@@ -73,6 +99,8 @@ export function TravellerDashboard() {
     socket.on('participant:joined', refresh);
     socket.on('participant:left', refresh);
     socket.on('social:updated', refresh);
+    socket.on('broadcast:new', onBroadcastNew);
+    socket.on('broadcast:cleared', onBroadcastCleared);
 
     return () => {
       socket.off('activity:created', refresh);
@@ -82,6 +110,8 @@ export function TravellerDashboard() {
       socket.off('participant:joined', refresh);
       socket.off('participant:left', refresh);
       socket.off('social:updated', refresh);
+      socket.off('broadcast:new', onBroadcastNew);
+      socket.off('broadcast:cleared', onBroadcastCleared);
     };
   }, [loadData]);
 
@@ -103,6 +133,33 @@ export function TravellerDashboard() {
             <Plus weight="bold" className="w-3.5 h-3.5 text-[#a93017]" /> Host Plan
           </Link>
         </div>
+
+        {/* Live Hostel Lobby Broadcast Banner */}
+        {broadcast && broadcast._id !== dismissedBroadcastId && (
+          <div className="rounded-2xl bg-gradient-to-r from-[#a93017] to-[#c44024] text-white p-4 shadow-md border border-white/10 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
+                <Megaphone weight="duotone" className="w-5 h-5 text-amber-200" />
+              </div>
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[9px] font-extrabold uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" />
+                  Hostel Notice
+                </span>
+                <p className="text-sm font-extrabold leading-snug mt-1">{broadcast.title}</p>
+                <p className="text-xs text-white/90 mt-0.5 leading-relaxed">{broadcast.message}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDismissedBroadcastId(broadcast._id)}
+              className="p-1 rounded-full hover:bg-white/15 text-white/80 shrink-0"
+              aria-label="Dismiss notice"
+            >
+              <X weight="bold" className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Hero: Live Hostel Radar + Inline Vibe Switcher */}
         <CommonRoomRadar
