@@ -303,7 +303,7 @@ export function DiscoverTravellersPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {filteredTravellers.map((t, idx) => {
               const initials = t.nickname
                 .split(' ')

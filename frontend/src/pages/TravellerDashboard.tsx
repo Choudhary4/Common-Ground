@@ -232,7 +232,7 @@ export function TravellerDashboard() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3.5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
             {activities.map((a) => (
               <ActivityCard key={a._id} activity={a} onJoined={loadData} />
             ))}
