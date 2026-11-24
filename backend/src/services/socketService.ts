@@ -45,7 +45,9 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
   io.use(async (socket, next) => {
     try {
       const cookies = parseCookies(socket.handshake.headers.cookie);
-      const rawToken = cookies[SESSION_COOKIE_NAME];
+      const authToken =
+        typeof socket.handshake.auth?.token === 'string' ? socket.handshake.auth.token : undefined;
+      const rawToken = cookies[SESSION_COOKIE_NAME] || authToken;
       if (!rawToken) return next(new Error('Unauthorized'));
 
       const session = await Session.findOne({

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { apiRequest } from '../lib/api';
+import { apiRequest, clearSessionToken } from '../lib/api';
 import { disconnectSocket } from '../lib/socket';
 
 export type UserRole = 'CENTRAL_ADMIN' | 'HOSTEL_MANAGER' | 'HOSTEL_STAFF' | 'TRAVELLER';
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiRequest('/auth/logout', { method: 'POST' });
     } finally {
+      clearSessionToken();
       disconnectSocket();
       setUser(null);
     }

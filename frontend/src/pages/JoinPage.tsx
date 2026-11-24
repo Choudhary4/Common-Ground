@@ -14,7 +14,8 @@ import {
   LockSimple,
   QrCode,
 } from '@phosphor-icons/react';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, setSessionToken } from '../lib/api';
+import { disconnectSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
 import { enablePushNotifications, isPushSupported } from '../lib/push';
 import { Avatar, PRESET_AVATARS } from '../components/Avatar';
@@ -92,7 +93,7 @@ export function JoinPage() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await apiRequest('/auth/traveller/onboard', {
+      const res = await apiRequest<{ sessionToken?: string }>('/auth/traveller/onboard', {
         method: 'POST',
         body: JSON.stringify({
           qrToken: token,
@@ -101,6 +102,10 @@ export function JoinPage() {
           avatar,
         }),
       });
+      if (res.sessionToken) {
+        setSessionToken(res.sessionToken);
+        disconnectSocket();
+      }
       await refreshAuth();
       if (isPushSupported() && Notification.permission === 'default') {
         await enablePushNotifications().catch(() => {});

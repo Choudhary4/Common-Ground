@@ -24,7 +24,12 @@ declare global {
 
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const rawToken = req.cookies?.[SESSION_COOKIE_NAME];
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7).trim()
+        : undefined;
+    const rawToken = req.cookies?.[SESSION_COOKIE_NAME] || bearerToken;
     if (!rawToken || typeof rawToken !== 'string') {
       res.status(401).json({ error: 'Authentication required' });
       return;

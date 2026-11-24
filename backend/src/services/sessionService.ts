@@ -9,7 +9,7 @@ export async function createSessionAndSetCookie(
   res: Response,
   userId: Types.ObjectId,
   hostelId: Types.ObjectId | null
-): Promise<{ expiresAt: Date }> {
+): Promise<{ expiresAt: Date; token: string }> {
   const rawToken = generateSecureToken(32);
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);
@@ -29,7 +29,7 @@ export async function createSessionAndSetCookie(
     path: '/',
   });
 
-  return { expiresAt };
+  return { expiresAt, token: rawToken };
 }
 
 export async function revokeSessionAndClearCookie(

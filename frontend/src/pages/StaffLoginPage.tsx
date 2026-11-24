@@ -9,7 +9,8 @@ import {
   EnvelopeSimple,
   LockKey,
 } from '@phosphor-icons/react';
-import { apiRequest, ApiError } from '../lib/api';
+import { apiRequest, ApiError, setSessionToken } from '../lib/api';
+import { disconnectSocket } from '../lib/socket';
 import { useAuth, type UserRole } from '../context/AuthContext';
 import { Footer } from '../components/Footer';
 
@@ -27,10 +28,17 @@ export function StaffLoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await apiRequest<{ user: { role: UserRole } }>('/auth/staff/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await apiRequest<{ user: { role: UserRole }; sessionToken?: string }>(
+        '/auth/staff/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        }
+      );
+      if (res.sessionToken) {
+        setSessionToken(res.sessionToken);
+        disconnectSocket();
+      }
       await refreshAuth();
       if (res.user.role === 'CENTRAL_ADMIN') navigate('/admin');
       else if (res.user.role === 'HOSTEL_MANAGER') navigate('/manager');

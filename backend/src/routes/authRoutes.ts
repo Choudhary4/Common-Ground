@@ -56,7 +56,7 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
       isDemo: hostel.isDemo,
     });
 
-    const { expiresAt } = await createSessionAndSetCookie(res, user._id, hostel._id);
+    const { expiresAt, token: sessionToken } = await createSessionAndSetCookie(res, user._id, hostel._id);
 
     await AnalyticsEvent.create({
       hostelId: hostel._id,
@@ -78,6 +78,7 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
         hostelCity: hostel.city,
         interests: user.interests,
       },
+      sessionToken,
       expiresAt,
     });
   } catch (err) {
@@ -114,7 +115,7 @@ router.post('/staff/login', authRateLimiter, async (req, res, next) => {
       return;
     }
 
-    const { expiresAt } = await createSessionAndSetCookie(res, user._id, user.hostelId);
+    const { expiresAt, token: sessionToken } = await createSessionAndSetCookie(res, user._id, user.hostelId);
     await recordAuditLog({
       actorId: user._id,
       actorRole: user.role,
@@ -135,6 +136,7 @@ router.post('/staff/login', authRateLimiter, async (req, res, next) => {
         hostelId: user.hostelId,
         hostelName: hostel?.name ?? null,
       },
+      sessionToken,
       expiresAt,
     });
   } catch (err) {
