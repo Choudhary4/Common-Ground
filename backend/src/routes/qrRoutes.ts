@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Hostel, HostelQR, AnalyticsEvent } from '../models/index.js';
+import { Hostel, HostelQR, AnalyticsEvent, Session } from '../models/index.js';
 import { hashToken } from '../utils/crypto.js';
 
 const router = Router();
@@ -32,12 +32,19 @@ router.get('/resolve/:token', async (req, res, next) => {
       isDemo: hostel.isDemo,
     });
 
+    const activeSessions = await Session.distinct('userId', {
+      hostelId: hostel._id,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+
     res.json({
       hostel: {
         id: hostel._id,
         name: hostel.name,
         city: hostel.city,
         address: hostel.address,
+        activeTravellersCount: activeSessions.length,
       },
     });
   } catch (err) {
