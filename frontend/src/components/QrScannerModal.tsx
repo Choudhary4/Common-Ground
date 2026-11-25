@@ -184,7 +184,7 @@ export function QrScannerModal({ onClose }: { onClose: () => void }) {
                 type="text"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
-                placeholder="http://localhost:5173/join/..."
+                placeholder={`${window.location.origin}/join/...`}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs"
               />
             </div>
