@@ -40,6 +40,15 @@ interface HostelMetricRow {
   lastWeekEvents?: number;
 }
 
+interface VisitorRow {
+  id: string;
+  nickname: string;
+  hostelName: string;
+  ipAddress: string;
+  deviceLabel: string;
+  createdAt: string;
+}
+
 interface AdminOverview {
   activeHostels: number;
   managers: number;
@@ -50,8 +59,10 @@ interface AdminOverview {
     qrScans: number;
     activitiesJoined: number;
     activitiesCompleted: number;
+    uniqueIps?: number;
   };
   hostelBreakdown: HostelMetricRow[];
+  recentVisitors?: VisitorRow[];
 }
 
 interface HostelRow {
@@ -661,6 +672,69 @@ export function AdminDashboardPage() {
                           </tr>
                         );
                       })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* 03 · VERIFIED REAL VISITORS (IP & DEVICE) */}
+          {(section === 'overview' || section === 'analytics') && (
+            <section className="bg-white rounded-3xl border border-[#e0bfb8]/25 p-5 sm:p-7 shadow-2xs space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#a93017]">
+                    03 · VERIFIED REAL VISITORS
+                  </p>
+                  <h2 className="text-lg font-extrabold text-[#111c2d] mt-0.5">
+                    Device &amp; Network Proof (Non-Demo)
+                  </h2>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#ccf5e7] text-[#0b6b52] text-xs font-extrabold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  {overview?.realMetrics.uniqueIps ?? 0} Unique Real IPs
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#f4f6fc] text-[10px] font-extrabold uppercase tracking-wider text-[#59413c]">
+                      <th className="py-3 px-4 rounded-l-xl">Traveller</th>
+                      <th className="py-3 px-3">Property / Space</th>
+                      <th className="py-3 px-3">Device</th>
+                      <th className="py-3 px-3">IP Address</th>
+                      <th className="py-3 px-4 rounded-r-xl text-right">Joined At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(overview?.recentVisitors ?? []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-[#59413c] font-semibold">
+                          No real visitors recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      (overview?.recentVisitors ?? []).map((v) => (
+                        <tr key={v.id} className="hover:bg-[#f9f9ff] transition">
+                          <td className="py-3 px-4 font-extrabold text-[#111c2d]">{v.nickname}</td>
+                          <td className="py-3 px-3 font-semibold text-[#59413c]">
+                            {v.hostelName}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2.5 py-0.5 rounded-full bg-[#f0f3ff] text-[#14241E] text-[11px] font-bold">
+                              {v.deviceLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px] font-bold text-[#111c2d]">
+                            {v.ipAddress}
+                          </td>
+                          <td className="py-3 px-4 text-right text-[11px] text-slate-500">
+                            {new Date(v.createdAt).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>

@@ -28,6 +28,8 @@ router.get('/overview', async (_req, res, next) => {
       perHostelTravellers,
       thisWeekEvents,
       lastWeekEvents,
+      recentRealTravellers,
+      distinctIps,
     ] = await Promise.all([
       Hostel.find().select('_id name city status isDemo').lean(),
       Hostel.countDocuments({ status: 'ACTIVE' }),
@@ -55,6 +57,16 @@ router.get('/overview', async (_req, res, next) => {
         { $match: { isDemo: false, createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
         { $group: { _id: '$hostelId', count: { $sum: 1 } } },
       ]),
+      User.find({ role: 'TRAVELLER', isDemo: false })
+        .select('_id nickname hostelId ipAddress deviceLabel createdAt')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+      User.distinct('ipAddress', {
+        role: 'TRAVELLER',
+        isDemo: false,
+        ipAddress: { $nin: [null, ''] },
+      }),
     ]);
 
     const eventCounts: Record<string, number> = {};
@@ -94,6 +106,8 @@ router.get('/overview', async (_req, res, next) => {
       };
     });
 
+    const hNameMap = new Map(hostels.map((h) => [h._id.toString(), h.name]));
+
     res.json({
       activeHostels: hostelCount,
       managers: managerCount,
@@ -104,8 +118,17 @@ router.get('/overview', async (_req, res, next) => {
         qrScans: eventCounts.QR_SCAN ?? 0,
         activitiesJoined: eventCounts.ACTIVITY_JOINED ?? 0,
         activitiesCompleted: eventCounts.ACTIVITY_COMPLETED ?? 0,
+        uniqueIps: distinctIps.length,
       },
       hostelBreakdown,
+      recentVisitors: recentRealTravellers.map((u) => ({
+        id: u._id,
+        nickname: u.nickname,
+        hostelName: u.hostelId ? (hNameMap.get(u.hostelId.toString()) ?? 'Unknown') : 'Unknown',
+        ipAddress: u.ipAddress ?? '—',
+        deviceLabel: u.deviceLabel ?? 'Unknown Device',
+        createdAt: u.createdAt,
+      })),
     });
   } catch (err) {
     next(err);

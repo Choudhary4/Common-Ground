@@ -10,6 +10,40 @@ import { emitToHostel } from '../services/socketService.js';
 
 const router = Router();
 
+function getClientIp(req: import('express').Request): string | null {
+  const fwd = req.headers['x-forwarded-for'];
+  const raw = Array.isArray(fwd) ? fwd[0] : typeof fwd === 'string' ? fwd.split(',')[0] : req.ip;
+  if (!raw) return null;
+  return raw.replace(/^::ffff:/, '').trim().slice(0, 100) || null;
+}
+
+function getDeviceLabel(uaHeader: string | undefined): string {
+  const ua = uaHeader || '';
+  const os = /iPhone/i.test(ua)
+    ? 'iPhone'
+    : /iPad/i.test(ua)
+      ? 'iPad'
+      : /Android/i.test(ua)
+        ? 'Android'
+        : /Macintosh|Mac OS/i.test(ua)
+          ? 'Mac'
+          : /Windows/i.test(ua)
+            ? 'Windows'
+            : /Linux/i.test(ua)
+              ? 'Linux'
+              : 'Device';
+  const browser = /Edg\//i.test(ua)
+    ? 'Edge'
+    : /Chrome|CriOS/i.test(ua)
+      ? 'Chrome'
+      : /Safari/i.test(ua)
+        ? 'Safari'
+        : /Firefox|FxiOS/i.test(ua)
+          ? 'Firefox'
+          : 'Browser';
+  return `${os} · ${browser}`;
+}
+
 const travellerOnboardSchema = z.object({
   qrToken: z.string().min(10),
   nickname: z.string().trim().min(2, 'Nickname must be at least 2 characters').max(40),
@@ -53,6 +87,8 @@ router.post('/traveller/onboard', authRateLimiter, async (req, res, next) => {
       role: 'TRAVELLER',
       hostelId: hostel._id,
       interests: interests ?? [],
+      ipAddress: getClientIp(req),
+      deviceLabel: getDeviceLabel(req.headers['user-agent']),
       isDemo: hostel.isDemo,
     });
 

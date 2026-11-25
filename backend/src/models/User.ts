@@ -13,6 +13,8 @@ export interface IUser extends Document {
   avatar?: string | null;
   interests: string[];
   blockedUserIds: Types.ObjectId[];
+  ipAddress?: string | null;
+  deviceLabel?: string | null;
   isDemo: boolean;
   createdAt: Date;
 }
@@ -33,6 +35,8 @@ const userSchema = new Schema<IUser>(
     avatar: { type: String, default: null, maxlength: 200 },
     interests: { type: [String], default: [] },
     blockedUserIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
+    ipAddress: { type: String, default: null, maxlength: 100 },
+    deviceLabel: { type: String, default: null, maxlength: 100 },
     isDemo: { type: Boolean, default: false, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
