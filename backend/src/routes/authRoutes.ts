@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { User, Hostel, HostelQR, AccessCode, AnalyticsEvent } from '../models/index.js';
-import { verifyPassword, hashToken, hashAccessCode } from '../utils/crypto.js';
+import { verifyPassword, hashPassword, hashToken, hashAccessCode } from '../utils/crypto.js';
 import { authenticate } from '../middleware/auth.js';
 import { authRateLimiter } from '../middleware/rateLimit.js';
 import { createSessionAndSetCookie, revokeSessionAndClearCookie } from '../services/sessionService.js';
@@ -135,6 +135,86 @@ router.post('/staff/login', authRateLimiter, async (req, res, next) => {
         role: user.role,
         hostelId: user.hostelId,
         hostelName: hostel?.name ?? null,
+      },
+      sessionToken,
+      expiresAt,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const staffRegisterSchema = z.object({
+  nickname: z.string().trim().min(2, 'Name must be at least 2 characters').max(40),
+  email: z.string().trim().email('Valid email is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  hostelName: z.string().trim().min(2, 'Hostel / space name is required').max(120),
+  city: z.string().trim().min(2, 'City is required').max(80),
+  address: z.string().trim().max(250).optional(),
+});
+
+router.post('/staff/register', authRateLimiter, async (req, res, next) => {
+  try {
+    const data = staffRegisterSchema.parse(req.body);
+    const normalizedEmail = data.email.toLowerCase();
+
+    const existing = await User.findOne({ email: normalizedEmail }).lean();
+    if (existing) {
+      res.status(409).json({ error: 'An account with this email already exists' });
+      return;
+    }
+
+    const baseSlug = `${data.hostelName}-${data.city}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const slugExists = await Hostel.findOne({ slug: baseSlug }).lean();
+    const slug = slugExists ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
+
+    const hostel = await Hostel.create({
+      name: data.hostelName,
+      city: data.city,
+      address: data.address?.trim() || data.city,
+      slug,
+      status: 'ACTIVE',
+      isDemo: false,
+    });
+
+    const passwordHash = await hashPassword(data.password);
+    const user = await User.create({
+      nickname: data.nickname,
+      email: normalizedEmail,
+      passwordHash,
+      role: 'HOSTEL_MANAGER',
+      hostelId: hostel._id,
+      status: 'ACTIVE',
+      isDemo: false,
+    });
+
+    const { expiresAt, token: sessionToken } = await createSessionAndSetCookie(
+      res,
+      user._id,
+      hostel._id
+    );
+
+    await recordAuditLog({
+      actorId: user._id,
+      actorRole: user.role,
+      hostelId: hostel._id,
+      action: 'HOSTEL_AND_MANAGER_SELF_REGISTERED',
+      targetType: 'Hostel',
+      targetId: hostel._id.toString(),
+    });
+
+    res.status(201).json({
+      user: {
+        id: user._id,
+        nickname: user.nickname,
+        email: user.email,
+        role: user.role,
+        hostelId: hostel._id,
+        hostelName: hostel.name,
+        hostelCity: hostel.city,
       },
       sessionToken,
       expiresAt,
