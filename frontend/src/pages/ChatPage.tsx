@@ -100,6 +100,10 @@ export function ChatPage() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const stopTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
 
   // Create group modal
   const [groupModalOpen, setGroupModalOpen] = useState(false);
@@ -233,6 +237,12 @@ export function ChatPage() {
     const socket = getSocket();
     const onMessage = (msg: ChatMessageItem) => {
       if (roomId && msg.roomId === roomId) {
+        setTypingUsers((prev) => {
+          if (!(msg.senderId in prev)) return prev;
+          const next = { ...prev };
+          delete next[msg.senderId];
+          return next;
+        });
         setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
         if (msg.senderId !== user?.id) {
           void apiRequest(`/chat/rooms/${roomId}/read`, { method: 'POST' })
@@ -264,6 +274,35 @@ export function ChatPage() {
         return next;
       });
     };
+    const onTyping = (data: {
+      roomId: string;
+      userId: string;
+      nickname: string;
+      isTyping: boolean;
+    }) => {
+      if (!roomId || data.roomId !== roomId || data.userId === user?.id) return;
+      if (typingTimersRef.current[data.userId]) {
+        clearTimeout(typingTimersRef.current[data.userId]);
+        delete typingTimersRef.current[data.userId];
+      }
+      if (data.isTyping) {
+        setTypingUsers((prev) => ({ ...prev, [data.userId]: data.nickname }));
+        typingTimersRef.current[data.userId] = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[data.userId];
+            return next;
+          });
+        }, 3500);
+      } else {
+        setTypingUsers((prev) => {
+          if (!(data.userId in prev)) return prev;
+          const next = { ...prev };
+          delete next[data.userId];
+          return next;
+        });
+      }
+    };
 
     socket.on('chat:message', onMessage);
     socket.on('chat:seen', onSeen);
@@ -272,6 +311,7 @@ export function ChatPage() {
     socket.on('social:updated', onRoomCreated);
     socket.on('presence:list', onPresenceList);
     socket.on('presence:update', onPresenceUpdate);
+    socket.on('chat:typing', onTyping);
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:seen', onSeen);
@@ -280,6 +320,10 @@ export function ChatPage() {
       socket.off('social:updated', onRoomCreated);
       socket.off('presence:list', onPresenceList);
       socket.off('presence:update', onPresenceUpdate);
+      socket.off('chat:typing', onTyping);
+      Object.values(typingTimersRef.current).forEach(clearTimeout);
+      typingTimersRef.current = {};
+      setTypingUsers({});
     };
   }, [roomId, loadRooms, user?.id]);
 
@@ -335,11 +379,36 @@ export function ChatPage() {
     }
   };
 
+  const handleTextChange = (val: string) => {
+    setText(val);
+    if (!roomId) return;
+    const socket = getSocket();
+    const now = Date.now();
+    if (val.trim()) {
+      if (now - lastTypingSentRef.current > 1400) {
+        lastTypingSentRef.current = now;
+        socket.emit('chat:typing', { roomId, isTyping: true });
+      }
+      if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current);
+      stopTypingTimerRef.current = setTimeout(() => {
+        socket.emit('chat:typing', { roomId, isTyping: false });
+        lastTypingSentRef.current = 0;
+      }, 2000);
+    } else {
+      if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current);
+      socket.emit('chat:typing', { roomId, isTyping: false });
+      lastTypingSentRef.current = 0;
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomId || !text.trim() || sending) return;
     const body = text.trim();
     setText('');
+    if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current);
+    getSocket().emit('chat:typing', { roomId, isTyping: false });
+    lastTypingSentRef.current = 0;
     setSending(true);
     try {
       const res = await apiRequest<{ message: ChatMessageItem }>(
@@ -530,14 +599,22 @@ export function ChatPage() {
                       {activeRoom.name}
                     </h2>
                     <p className="text-[11px] text-[#59413c] truncate flex items-center gap-1.5">
-                      {groupOnlineCount > 0 && (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          {groupOnlineCount} online
+                      {Object.values(typingUsers).length > 0 ? (
+                        <span className="text-emerald-600 font-extrabold animate-pulse">
+                          {Object.values(typingUsers)[0]} is typing...
                         </span>
+                      ) : (
+                        <>
+                          {groupOnlineCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              {groupOnlineCount} online
+                            </span>
+                          )}
+                          {groupOnlineCount > 0 && <span>·</span>}
+                          <span>{activeRoom.members.length} members</span>
+                        </>
                       )}
-                      {groupOnlineCount > 0 && <span>·</span>}
-                      <span>{activeRoom.members.length} members</span>
                     </p>
                   </div>
                 </button>
@@ -572,7 +649,11 @@ export function ChatPage() {
                     {activeRoom?.name ?? 'Hostel Chat'}
                   </h2>
                   <p className="text-[11px] truncate flex items-center gap-1">
-                    {isOtherOnline ? (
+                    {Object.values(typingUsers).length > 0 ? (
+                      <span className="text-emerald-600 font-extrabold animate-pulse">
+                        typing...
+                      </span>
+                    ) : isOtherOnline ? (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                         <span className="text-emerald-600 font-bold">Online</span>
@@ -665,6 +746,15 @@ export function ChatPage() {
                 );
               })
             )}
+            {Object.values(typingUsers).length > 0 && (
+              <div className="flex items-end gap-2 justify-start">
+                <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white border border-[#e0bfb8]/35 shadow-2xs flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#14241E]/60 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#14241E]/60 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#14241E]/60 animate-bounce" />
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -676,7 +766,7 @@ export function ChatPage() {
             <input
               type="text"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => handleTextChange(e.target.value)}
               placeholder="Write a message..."
               maxLength={500}
               className="flex-1 px-4 py-2.5 rounded-full bg-[#f0f3ff] text-[16px] sm:text-xs text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20"

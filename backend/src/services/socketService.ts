@@ -1,7 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server as SocketIOServer } from 'socket.io';
 import { env } from '../config/env.js';
-import { Session, User } from '../models/index.js';
+import { Session, User, ChatRoom } from '../models/index.js';
 import { hashToken } from '../utils/crypto.js';
 import { SESSION_COOKIE_NAME } from '../middleware/auth.js';
 
@@ -61,6 +61,7 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
       if (!user || user.status !== 'ACTIVE') return next(new Error('Forbidden'));
 
       socket.data.userId = user._id.toString();
+      socket.data.nickname = user.nickname;
       socket.data.hostelId = user.hostelId ? user.hostelId.toString() : null;
       socket.data.role = user.role;
       next();
@@ -88,6 +89,32 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
       }
       socket.emit('presence:list', { onlineUserIds: getOnlineUserIds(hostelId) });
     }
+
+    socket.on('chat:typing', async (payload: { roomId?: string; isTyping?: boolean }) => {
+      try {
+        if (!userId || !payload?.roomId || typeof payload.roomId !== 'string') return;
+        const room = await ChatRoom.findOne({
+          _id: payload.roomId,
+          memberIds: userId,
+        })
+          .select('memberIds')
+          .lean();
+        if (!room) return;
+        for (const memberId of room.memberIds) {
+          const mid = memberId.toString();
+          if (mid !== userId) {
+            io?.to(`user:${mid}`).emit('chat:typing', {
+              roomId: payload.roomId,
+              userId,
+              nickname: socket.data.nickname ?? 'Traveller',
+              isTyping: Boolean(payload.isTyping),
+            });
+          }
+        }
+      } catch {
+        // ignore invalid roomId
+      }
+    });
 
     socket.on('disconnect', () => {
       if (hostelId && userId) {
