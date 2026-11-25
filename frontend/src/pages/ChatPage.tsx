@@ -434,45 +434,93 @@ export function ChatPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomId || !text.trim() || sending) return;
+    if (!roomId || !text.trim() || !user) return;
     const body = text.trim();
+    const replySnapshot = replyingTo
+      ? {
+          messageId: replyingTo._id,
+          senderNickname: replyingTo.senderNickname,
+          text: replyingTo.text.slice(0, 140),
+        }
+      : null;
     const replyToId = replyingTo?._id;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    const optimisticMsg: ChatMessageItem = {
+      _id: tempId,
+      roomId,
+      senderId: user.id,
+      senderNickname: user.nickname,
+      senderAvatar: user.avatar ?? null,
+      text: body,
+      replyTo: replySnapshot,
+      reactions: [],
+      createdAt: new Date().toISOString(),
+    };
+
     setText('');
     setReplyingTo(null);
     if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current);
     getSocket().emit('chat:typing', { roomId, isTyping: false });
     lastTypingSentRef.current = 0;
-    setSending(true);
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+
     try {
       const res = await apiRequest<{ message: ChatMessageItem }>(
         `/chat/rooms/${roomId}/messages`,
         {
           method: 'POST',
-          body: JSON.stringify({ text: body, ...(replyToId ? { replyToId } : {}) }),
+          body: JSON.stringify({
+            text: body,
+            ...(replyToId && !replyToId.startsWith('temp-') ? { replyToId } : {}),
+          }),
         }
       );
-      setMessages((prev) =>
-        prev.some((m) => m._id === res.message._id) ? prev : [...prev, res.message]
-      );
+      setMessages((prev) => {
+        const alreadyHasReal = prev.some((m) => m._id === res.message._id);
+        if (alreadyHasReal) {
+          return prev.filter((m) => m._id !== tempId);
+        }
+        return prev.map((m) => (m._id === tempId ? res.message : m));
+      });
       void loadRooms();
-    } finally {
-      setSending(false);
+    } catch {
+      setMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setText(body);
     }
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {
-    if (!roomId) return;
+    if (!roomId || !user || messageId.startsWith('temp-')) return;
     setReactPickerMsgId(null);
-    const res = await apiRequest<{ reactions: Array<{ emoji: string; userId: string }> }>(
-      `/chat/rooms/${roomId}/messages/${messageId}/react`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ emoji }),
-      }
-    );
+
+    // Optimistically update reaction immediately
     setMessages((prev) =>
-      prev.map((m) => (m._id === messageId ? { ...m, reactions: res.reactions } : m))
+      prev.map((m) => {
+        if (m._id !== messageId) return m;
+        const current = m.reactions ?? [];
+        const existingSame = current.some((r) => r.userId === user.id && r.emoji === emoji);
+        const filtered = current.filter((r) => r.userId !== user.id);
+        const nextReactions = existingSame ? filtered : [...filtered, { emoji, userId: user.id }];
+        return { ...m, reactions: nextReactions };
+      })
     );
+
+    try {
+      const res = await apiRequest<{ reactions: Array<{ emoji: string; userId: string }> }>(
+        `/chat/rooms/${roomId}/messages/${messageId}/react`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ emoji }),
+        }
+      );
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? { ...m, reactions: res.reactions } : m))
+      );
+    } catch {
+      // ignore; next sync will reconcile
+    }
   };
 
   const openMembersModal = async () => {
@@ -717,7 +765,14 @@ export function ChatPage() {
           </div>
 
           {/* Messages (scrolls ONLY inside this box) */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 bg-[#f9f9ff]/60">
+          <div className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 bg-[#f9f9ff]/60">
+            {reactPickerMsgId && (
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setReactPickerMsgId(null)}
+                onTouchStart={() => setReactPickerMsgId(null)}
+              />
+            )}
             {loadingMsgs ? (
               <div className="py-10 flex justify-center text-slate-400">
                 <CircleNotch className="w-5 h-5 animate-spin" />
