@@ -5,39 +5,98 @@ import { AuthProvider, useAuth, type UserRole } from './context/AuthContext';
 import { LandingPage } from './pages/LandingPage';
 import { TravellerDashboard } from './pages/TravellerDashboard';
 
-// Route-level code splitting for faster mobile loads
-const JoinPage = lazy(() => import('./pages/JoinPage').then((m) => ({ default: m.JoinPage })));
-const DiscoverTravellersPage = lazy(() =>
+// Route-level code splitting with auto-reload fallback when a new Vercel deploy invalidates old chunks
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      sessionStorage.removeItem('cg_chunk_reload');
+      return mod;
+    } catch (err) {
+      if (!sessionStorage.getItem('cg_chunk_reload')) {
+        sessionStorage.setItem('cg_chunk_reload', '1');
+        window.location.reload();
+        return new Promise<{ default: T }>(() => {});
+      }
+      throw err;
+    }
+  });
+}
+
+const JoinPage = lazyWithRetry(() => import('./pages/JoinPage').then((m) => ({ default: m.JoinPage })));
+const DiscoverTravellersPage = lazyWithRetry(() =>
   import('./pages/DiscoverTravellersPage').then((m) => ({ default: m.DiscoverTravellersPage }))
 );
-const ActivityFormPage = lazy(() =>
+const ActivityFormPage = lazyWithRetry(() =>
   import('./pages/ActivityFormPage').then((m) => ({ default: m.ActivityFormPage }))
 );
-const ActivityDetailPage = lazy(() =>
+const ActivityDetailPage = lazyWithRetry(() =>
   import('./pages/ActivityDetailPage').then((m) => ({ default: m.ActivityDetailPage }))
 );
-const MyActivitiesPage = lazy(() =>
+const MyActivitiesPage = lazyWithRetry(() =>
   import('./pages/MyActivitiesPage').then((m) => ({ default: m.MyActivitiesPage }))
 );
-const NotificationsPage = lazy(() =>
+const NotificationsPage = lazyWithRetry(() =>
   import('./pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage }))
 );
-const SettingsPage = lazy(() =>
+const SettingsPage = lazyWithRetry(() =>
   import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
 );
-const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })));
-const StaffLoginPage = lazy(() =>
+const ChatPage = lazyWithRetry(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })));
+const StaffLoginPage = lazyWithRetry(() =>
   import('./pages/StaffLoginPage').then((m) => ({ default: m.StaffLoginPage }))
 );
-const StaffDashboardPage = lazy(() =>
+const StaffDashboardPage = lazyWithRetry(() =>
   import('./pages/StaffDashboardPage').then((m) => ({ default: m.StaffDashboardPage }))
 );
-const ManagerDashboardPage = lazy(() =>
+const ManagerDashboardPage = lazyWithRetry(() =>
   import('./pages/ManagerDashboardPage').then((m) => ({ default: m.ManagerDashboardPage }))
 );
-const AdminDashboardPage = lazy(() =>
+const AdminDashboardPage = lazyWithRetry(() =>
   import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage }))
 );
+
+class RouteErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#f9f9ff] px-6 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center shadow-md">
+            <Broadcast weight="duotone" className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-[#111c2d]">App Updated</h2>
+            <p className="text-xs text-[#59413c] mt-1">
+              A fresh version was just deployed. Tap below to reload.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 rounded-full bg-[#a93017] text-white text-xs font-bold shadow-xs"
+          >
+            Refresh Now
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function RadarLoadingScreen() {
   return (
@@ -118,7 +177,8 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <PwaBackHandler />
-        <Suspense fallback={<RadarLoadingScreen />}>
+        <RouteErrorBoundary>
+          <Suspense fallback={<RadarLoadingScreen />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/join/:token" element={<JoinPage />} />
@@ -236,7 +296,8 @@ export function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Suspense>
+          </Suspense>
+        </RouteErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );
