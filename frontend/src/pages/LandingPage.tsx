@@ -42,6 +42,13 @@ export function LandingPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/staff/login"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white hover:bg-[#f0f3ff] border border-[#e0bfb8]/50 text-[#14241E] text-xs font-bold shadow-2xs transition active:scale-95"
+          >
+            <Buildings weight="duotone" className="w-3.5 h-3.5 text-[#a93017]" />
+            <span>Manager Login</span>
+          </Link>
           {user && (
             <Link
               to={dashboardPath}
@@ -119,6 +126,31 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* Hostel Manager Self-Serve Banner (above the fold) */}
+        <section className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-[#f0f3ff] text-[#14241E] flex items-center justify-center shrink-0">
+              <Buildings weight="duotone" className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-[#111c2d]">
+                Hostel Manager or Community Host?
+              </h2>
+              <p className="text-xs text-[#59413c] mt-0.5 leading-relaxed">
+                Sign in or create your own property space to generate a live QR poster &amp; access
+                code in 10 seconds.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/staff/login"
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full bg-[#14241E] hover:bg-emerald-950 text-emerald-300 text-xs font-bold shadow-xs transition active:scale-95"
+          >
+            <span>Manager Login / Create Space</span>
+            <ArrowRight weight="bold" className="w-3.5 h-3.5" />
+          </Link>
+        </section>
+
         {/* 3-Step Bento Grid */}
         <section className="grid sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 shadow-xs hover:shadow-sm transition">
@@ -178,31 +210,6 @@ export function LandingPage() {
             <BellRinging weight="duotone" className="w-4 h-4 text-[#14241E] shrink-0" />
             <span>Instant mobile alerts</span>
           </div>
-        </section>
-
-        {/* Hostel Manager Self-Serve Banner */}
-        <section className="bg-white rounded-3xl border border-[#e0bfb8]/35 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-[#f0f3ff] text-[#14241E] flex items-center justify-center shrink-0">
-              <Buildings weight="duotone" className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-sm font-extrabold text-[#111c2d]">
-                Hostel Manager or Community Host?
-              </h2>
-              <p className="text-xs text-[#59413c] mt-0.5 leading-relaxed">
-                Sign in or create your own property space to generate a live QR poster &amp; access
-                code in 10 seconds.
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/staff/login"
-            className="shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full bg-[#14241E] hover:bg-emerald-950 text-emerald-300 text-xs font-bold shadow-xs transition active:scale-95"
-          >
-            <span>Manager Login / Create Space</span>
-            <ArrowRight weight="bold" className="w-3.5 h-3.5" />
-          </Link>
         </section>
       </main>
 
