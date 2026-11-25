@@ -17,6 +17,8 @@ import {
   MapPin,
   Prohibit,
   PencilSimple,
+  ArrowBendUpLeft,
+  Smiley,
 } from '@phosphor-icons/react';
 import { TravellerLayout } from '../components/TravellerLayout';
 import { Avatar, GROUP_PRESET_AVATARS } from '../components/Avatar';
@@ -51,8 +53,19 @@ interface ChatMessageItem {
   senderNickname: string;
   senderAvatar: string | null;
   text: string;
+  replyTo?: {
+    messageId: string;
+    senderNickname: string;
+    text: string;
+  } | null;
+  reactions?: Array<{
+    emoji: string;
+    userId: string;
+  }>;
   createdAt: string;
 }
+
+const REACTION_EMOJIS = ['❤️', '😂', '👍', '🔥', '😮', '🙏'];
 
 interface HostelTraveller {
   userId: string;
@@ -100,6 +113,9 @@ export function ChatPage() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ChatMessageItem | null>(null);
+  const [reactPickerMsgId, setReactPickerMsgId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const stopTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -304,6 +320,17 @@ export function ChatPage() {
       }
     };
 
+    const onReaction = (data: {
+      roomId: string;
+      messageId: string;
+      reactions: Array<{ emoji: string; userId: string }>;
+    }) => {
+      if (!roomId || data.roomId !== roomId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m._id === data.messageId ? { ...m, reactions: data.reactions } : m))
+      );
+    };
+
     socket.on('chat:message', onMessage);
     socket.on('chat:seen', onSeen);
     socket.on('chat:room_created', onRoomCreated);
@@ -312,6 +339,7 @@ export function ChatPage() {
     socket.on('presence:list', onPresenceList);
     socket.on('presence:update', onPresenceUpdate);
     socket.on('chat:typing', onTyping);
+    socket.on('chat:reaction', onReaction);
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:seen', onSeen);
@@ -321,9 +349,12 @@ export function ChatPage() {
       socket.off('presence:list', onPresenceList);
       socket.off('presence:update', onPresenceUpdate);
       socket.off('chat:typing', onTyping);
+      socket.off('chat:reaction', onReaction);
       Object.values(typingTimersRef.current).forEach(clearTimeout);
       typingTimersRef.current = {};
       setTypingUsers({});
+      setReplyingTo(null);
+      setReactPickerMsgId(null);
     };
   }, [roomId, loadRooms, user?.id]);
 
@@ -405,7 +436,9 @@ export function ChatPage() {
     e.preventDefault();
     if (!roomId || !text.trim() || sending) return;
     const body = text.trim();
+    const replyToId = replyingTo?._id;
     setText('');
+    setReplyingTo(null);
     if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current);
     getSocket().emit('chat:typing', { roomId, isTyping: false });
     lastTypingSentRef.current = 0;
@@ -415,7 +448,7 @@ export function ChatPage() {
         `/chat/rooms/${roomId}/messages`,
         {
           method: 'POST',
-          body: JSON.stringify({ text: body }),
+          body: JSON.stringify({ text: body, ...(replyToId ? { replyToId } : {}) }),
         }
       );
       setMessages((prev) =>
@@ -425,6 +458,21 @@ export function ChatPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!roomId) return;
+    setReactPickerMsgId(null);
+    const res = await apiRequest<{ reactions: Array<{ emoji: string; userId: string }> }>(
+      `/chat/rooms/${roomId}/messages/${messageId}/react`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+      }
+    );
+    setMessages((prev) =>
+      prev.map((m) => (m._id === messageId ? { ...m, reactions: res.reactions } : m))
+    );
   };
 
   const openMembersModal = async () => {
@@ -685,10 +733,25 @@ export function ChatPage() {
                 const isSeen =
                   mine &&
                   Object.values(readBy).some((ts) => new Date(ts).getTime() >= msgTime);
+
+                const reactionMap = new Map<string, { count: number; byMe: boolean }>();
+                for (const r of m.reactions ?? []) {
+                  const prev = reactionMap.get(r.emoji) ?? { count: 0, byMe: false };
+                  reactionMap.set(r.emoji, {
+                    count: prev.count + 1,
+                    byMe: prev.byMe || r.userId === user?.id,
+                  });
+                }
+                const groupedReactions = [...reactionMap.entries()];
+                const showPicker = reactPickerMsgId === m._id;
+
                 return (
                   <div
                     key={m._id}
-                    className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}
+                    id={`msg-${m._id}`}
+                    className={`group relative flex items-end gap-2 ${
+                      mine ? 'justify-end' : 'justify-start'
+                    }`}
                   >
                     {!mine && (
                       <button
@@ -704,44 +767,160 @@ export function ChatPage() {
                         />
                       </button>
                     )}
-                    <div
-                      className={`max-w-[75%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${
-                        mine
-                          ? 'bg-[#14241E] text-white rounded-br-sm'
-                          : 'bg-white border border-[#e0bfb8]/35 text-[#111c2d] rounded-bl-sm shadow-2xs'
-                      }`}
-                    >
-                      {!mine && activeRoom?.type === 'GROUP' && (
+
+                    {/* Action Icons (Left side for own messages) */}
+                    {mine && (
+                      <div className="flex items-center gap-0.5 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0 pb-1">
                         <button
                           type="button"
-                          onClick={() => openProfile(m.senderId)}
-                          className="block text-[10px] font-bold text-[#a93017] hover:underline mb-0.5 text-left"
+                          onClick={() => setReactPickerMsgId(showPicker ? null : m._id)}
+                          className="p-1 rounded-full hover:bg-slate-200/70 text-slate-400 hover:text-[#111c2d]"
+                          aria-label="React to message"
+                          title="React"
                         >
-                          {m.senderNickname}
+                          <Smiley weight="duotone" className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyingTo(m);
+                            setReactPickerMsgId(null);
+                            inputRef.current?.focus();
+                          }}
+                          className="p-1 rounded-full hover:bg-slate-200/70 text-slate-400 hover:text-[#111c2d]"
+                          aria-label="Reply to message"
+                          title="Reply"
+                        >
+                          <ArrowBendUpLeft weight="bold" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className={`max-w-[75%] flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                      {/* Floating Emoji Reaction Picker */}
+                      {showPicker && (
+                        <div className="mb-1.5 px-2 py-1 rounded-full bg-white border border-[#e0bfb8]/50 shadow-md flex items-center gap-1 z-20">
+                          {REACTION_EMOJIS.map((em) => (
+                            <button
+                              key={em}
+                              type="button"
+                              onClick={() => void toggleReaction(m._id, em)}
+                              className="w-7 h-7 rounded-full hover:bg-[#f0f3ff] active:scale-125 transition text-base flex items-center justify-center"
+                            >
+                              {em}
+                            </button>
+                          ))}
+                        </div>
                       )}
-                      <p className="break-words">{m.text}</p>
+
                       <div
-                        className={`text-[9px] mt-1 flex items-center justify-end gap-1 ${
-                          mine ? 'text-emerald-200/70' : 'text-slate-400'
+                        className={`w-full px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${
+                          mine
+                            ? 'bg-[#14241E] text-white rounded-br-sm'
+                            : 'bg-white border border-[#e0bfb8]/35 text-[#111c2d] rounded-bl-sm shadow-2xs'
                         }`}
                       >
-                        <span>
-                          {new Date(m.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        {mine &&
-                          (isSeen ? (
-                            <span className="font-semibold text-emerald-300">
-                              · Seen
-                            </span>
-                          ) : (
-                            <span className="text-emerald-200/50">· Sent</span>
-                          ))}
+                        {!mine && activeRoom?.type === 'GROUP' && (
+                          <button
+                            type="button"
+                            onClick={() => openProfile(m.senderId)}
+                            className="block text-[10px] font-bold text-[#a93017] hover:underline mb-0.5 text-left"
+                          >
+                            {m.senderNickname}
+                          </button>
+                        )}
+
+                        {m.replyTo && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document
+                                .getElementById(`msg-${m.replyTo!.messageId}`)
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }}
+                            className={`w-full text-left mb-1.5 pl-2.5 pr-2 py-1 rounded-lg border-l-2 text-[11px] ${
+                              mine
+                                ? 'bg-white/10 border-emerald-400 text-emerald-100'
+                                : 'bg-[#f0f3ff] border-[#a93017] text-[#59413c]'
+                            }`}
+                          >
+                            <p className="font-extrabold text-[10px] truncate">
+                              {m.replyTo.senderNickname}
+                            </p>
+                            <p className="truncate opacity-85">{m.replyTo.text}</p>
+                          </button>
+                        )}
+
+                        <p className="break-words">{m.text}</p>
+                        <div
+                          className={`text-[9px] mt-1 flex items-center justify-end gap-1 ${
+                            mine ? 'text-emerald-200/70' : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {new Date(m.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          {mine &&
+                            (isSeen ? (
+                              <span className="font-semibold text-emerald-300">· Seen</span>
+                            ) : (
+                              <span className="text-emerald-200/50">· Sent</span>
+                            ))}
+                        </div>
                       </div>
+
+                      {/* Reaction Pills */}
+                      {groupedReactions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {groupedReactions.map(([em, info]) => (
+                            <button
+                              key={em}
+                              type="button"
+                              onClick={() => void toggleReaction(m._id, em)}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border transition active:scale-95 ${
+                                info.byMe
+                                  ? 'bg-[#ffdad3]/60 border-[#a93017]/40 text-[#a93017]'
+                                  : 'bg-white border-[#e0bfb8]/40 text-[#111c2d]'
+                              }`}
+                            >
+                              <span>{em}</span>
+                              {info.count > 1 && <span>{info.count}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Action Icons (Right side for received messages) */}
+                    {!mine && (
+                      <div className="flex items-center gap-0.5 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0 pb-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyingTo(m);
+                            setReactPickerMsgId(null);
+                            inputRef.current?.focus();
+                          }}
+                          className="p-1 rounded-full hover:bg-slate-200/70 text-slate-400 hover:text-[#111c2d]"
+                          aria-label="Reply to message"
+                          title="Reply"
+                        >
+                          <ArrowBendUpLeft weight="bold" className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReactPickerMsgId(showPicker ? null : m._id)}
+                          className="p-1 rounded-full hover:bg-slate-200/70 text-slate-400 hover:text-[#111c2d]"
+                          aria-label="React to message"
+                          title="React"
+                        >
+                          <Smiley weight="duotone" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -758,16 +937,37 @@ export function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Reply Preview Banner */}
+          {replyingTo && (
+            <div className="shrink-0 px-4 py-2 bg-[#f0f3ff] border-t border-[#e0bfb8]/30 flex items-center justify-between gap-2">
+              <div className="min-w-0 border-l-2 border-[#a93017] pl-2.5">
+                <p className="text-[10px] font-extrabold text-[#a93017] truncate">
+                  Replying to {replyingTo.senderId === user?.id ? 'yourself' : replyingTo.senderNickname}
+                </p>
+                <p className="text-xs text-[#59413c] truncate">{replyingTo.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="p-1 rounded-full text-slate-400 hover:bg-white hover:text-[#111c2d] shrink-0"
+                aria-label="Cancel reply"
+              >
+                <X weight="bold" className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Pinned Input Bar */}
           <form
             onSubmit={handleSend}
             className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-[#e0bfb8]/30 bg-white flex items-center gap-2"
           >
             <input
+              ref={inputRef}
               type="text"
               value={text}
               onChange={(e) => handleTextChange(e.target.value)}
-              placeholder="Write a message..."
+              placeholder={replyingTo ? 'Write a reply...' : 'Write a message...'}
               maxLength={500}
               className="flex-1 px-4 py-2.5 rounded-full bg-[#f0f3ff] text-[16px] sm:text-xs text-[#111c2d] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#a93017]/20"
             />

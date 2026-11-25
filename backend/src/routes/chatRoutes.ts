@@ -399,6 +399,17 @@ router.get('/rooms/:roomId/messages', async (req, res, next) => {
         senderNickname: sMap.get(m.senderId.toString())?.nickname ?? 'Traveller',
         senderAvatar: sMap.get(m.senderId.toString())?.avatar ?? null,
         text: m.text,
+        replyTo: m.replyTo
+          ? {
+              messageId: m.replyTo.messageId.toString(),
+              senderNickname: m.replyTo.senderNickname,
+              text: m.replyTo.text,
+            }
+          : null,
+        reactions: (m.reactions ?? []).map((r) => ({
+          emoji: r.emoji,
+          userId: r.userId.toString(),
+        })),
         createdAt: m.createdAt,
       })),
     });
@@ -443,7 +454,12 @@ router.post('/rooms/:roomId/read', async (req, res, next) => {
 
 router.post('/rooms/:roomId/messages', async (req, res, next) => {
   try {
-    const { text } = z.object({ text: z.string().trim().min(1).max(500) }).parse(req.body);
+    const { text, replyToId } = z
+      .object({
+        text: z.string().trim().min(1).max(500),
+        replyToId: z.string().optional(),
+      })
+      .parse(req.body);
     const hostelId = req.auth!.hostelId!;
     const myId = req.auth!.userId;
 
@@ -457,6 +473,23 @@ router.post('/rooms/:roomId/messages', async (req, res, next) => {
       return;
     }
 
+    let replyTo: { messageId: Types.ObjectId; senderNickname: string; text: string } | null = null;
+    if (replyToId && Types.ObjectId.isValid(replyToId)) {
+      const targetMsg = await ChatMessage.findOne({
+        _id: replyToId,
+        roomId: room._id,
+        hostelId,
+      }).lean();
+      if (targetMsg) {
+        const targetSender = await User.findById(targetMsg.senderId).select('nickname').lean();
+        replyTo = {
+          messageId: targetMsg._id,
+          senderNickname: targetSender?.nickname ?? 'Traveller',
+          text: targetMsg.text.slice(0, 140),
+        };
+      }
+    }
+
     const me = await User.findById(myId).select('_id nickname avatar').lean();
 
     const msg = await ChatMessage.create({
@@ -464,6 +497,7 @@ router.post('/rooms/:roomId/messages', async (req, res, next) => {
       hostelId,
       senderId: myId,
       text,
+      replyTo,
     });
 
     room.lastMessageText = text;
@@ -478,6 +512,14 @@ router.post('/rooms/:roomId/messages', async (req, res, next) => {
       senderNickname: me?.nickname ?? req.auth!.nickname,
       senderAvatar: me?.avatar ?? null,
       text: msg.text,
+      replyTo: replyTo
+        ? {
+            messageId: replyTo.messageId.toString(),
+            senderNickname: replyTo.senderNickname,
+            text: replyTo.text,
+          }
+        : null,
+      reactions: [],
       createdAt: msg.createdAt,
     };
 
@@ -494,6 +536,60 @@ router.post('/rooms/:roomId/messages', async (req, res, next) => {
     }
 
     res.status(201).json({ message: payload });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/rooms/:roomId/messages/:messageId/react', async (req, res, next) => {
+  try {
+    const { emoji } = z.object({ emoji: z.string().trim().min(1).max(12) }).parse(req.body);
+    const hostelId = req.auth!.hostelId!;
+    const myId = req.auth!.userId;
+
+    const room = await ChatRoom.findOne({
+      _id: req.params.roomId,
+      hostelId,
+      memberIds: myId,
+    }).lean();
+    if (!room) {
+      res.status(404).json({ error: 'Chat room not found' });
+      return;
+    }
+
+    const msg = await ChatMessage.findOne({
+      _id: req.params.messageId,
+      roomId: room._id,
+      hostelId,
+    });
+    if (!msg) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    const existingSame = msg.reactions.some(
+      (r) => r.userId.toString() === myId.toString() && r.emoji === emoji
+    );
+    msg.reactions = msg.reactions.filter((r) => r.userId.toString() !== myId.toString());
+    if (!existingSame) {
+      msg.reactions.push({ emoji, userId: myId });
+    }
+    await msg.save();
+
+    const reactions = msg.reactions.map((r) => ({
+      emoji: r.emoji,
+      userId: r.userId.toString(),
+    }));
+
+    for (const memberId of room.memberIds) {
+      emitToUser(memberId.toString(), 'chat:reaction', {
+        roomId: room._id.toString(),
+        messageId: msg._id.toString(),
+        reactions,
+      });
+    }
+
+    res.json({ reactions });
   } catch (err) {
     next(err);
   }
