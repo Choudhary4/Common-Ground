@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Broadcast } from '@phosphor-icons/react';
 import { AuthProvider, useAuth, type UserRole } from './context/AuthContext';
 import { LandingPage } from './pages/LandingPage';
@@ -89,10 +89,35 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+function PwaBackHandler() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (seededRef.current) return;
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx === 0 && location.pathname.startsWith('/app/')) {
+      seededRef.current = true;
+      const target = `${location.pathname}${location.search}${location.hash}`;
+      navigate('/app', { replace: true });
+      if (location.pathname.startsWith('/app/chat/')) {
+        setTimeout(() => navigate('/app/chat'), 0);
+        setTimeout(() => navigate(target), 15);
+      } else {
+        setTimeout(() => navigate(target), 0);
+      }
+    }
+  }, [location.pathname, location.search, location.hash, navigate]);
+
+  return null;
+}
+
 export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PwaBackHandler />
         <Suspense fallback={<RadarLoadingScreen />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />

@@ -199,7 +199,11 @@ export function ActivityDetailPage() {
     <TravellerLayout>
       <div className="space-y-4">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+            if (idx > 0) navigate(-1);
+            else navigate('/app', { replace: true });
+          }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#e0bfb8]/40 text-xs font-bold text-[#59413c] hover:text-[#111c2d] shadow-2xs transition"
         >
           <ArrowLeft weight="bold" className="w-3.5 h-3.5" /> Back
