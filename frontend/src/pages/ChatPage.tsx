@@ -58,6 +58,8 @@ interface HostelTraveller {
   userId: string;
   nickname: string;
   avatar: string | null;
+  status?: string | null;
+  isOnline?: boolean;
 }
 
 interface TravellerProfile {
@@ -91,6 +93,7 @@ export function ChatPage() {
 
   const [rooms, setRooms] = useState<ChatRoomItem[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [startingChatId, setStartingChatId] = useState<string | null>(null);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [readBy, setReadBy] = useState<Record<string, string>>({});
@@ -167,8 +170,14 @@ export function ChatPage() {
 
   const loadRooms = useCallback(async () => {
     try {
-      const res = await apiRequest<{ rooms: ChatRoomItem[] }>('/chat/rooms');
+      const [res, discRes] = await Promise.all([
+        apiRequest<{ rooms: ChatRoomItem[] }>('/chat/rooms'),
+        apiRequest<{ travellers: HostelTraveller[] }>('/traveller/discover').catch(() => ({
+          travellers: [],
+        })),
+      ]);
       setRooms(res.rooms);
+      setHostelTravellers(discRes.travellers);
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
         for (const r of res.rooms) {
@@ -176,6 +185,9 @@ export function ChatPage() {
             if (m.online) next.add(m.userId);
             else next.delete(m.userId);
           }
+        }
+        for (const t of discRes.travellers) {
+          if (t.isOnline) next.add(t.userId);
         }
         return next;
       });
@@ -257,6 +269,7 @@ export function ChatPage() {
     socket.on('chat:seen', onSeen);
     socket.on('chat:room_created', onRoomCreated);
     socket.on('chat:room_updated', onRoomCreated);
+    socket.on('social:updated', onRoomCreated);
     socket.on('presence:list', onPresenceList);
     socket.on('presence:update', onPresenceUpdate);
     return () => {
@@ -264,6 +277,7 @@ export function ChatPage() {
       socket.off('chat:seen', onSeen);
       socket.off('chat:room_created', onRoomCreated);
       socket.off('chat:room_updated', onRoomCreated);
+      socket.off('social:updated', onRoomCreated);
       socket.off('presence:list', onPresenceList);
       socket.off('presence:update', onPresenceUpdate);
     };
@@ -434,6 +448,7 @@ export function ChatPage() {
 
   const startDirectChat = async (targetUserId: string) => {
     setProfileBusy(true);
+    setStartingChatId(targetUserId);
     try {
       const res = await apiRequest<{ roomId: string }>('/chat/rooms/direct', {
         method: 'POST',
@@ -445,6 +460,7 @@ export function ChatPage() {
       navigate(`/app/chat/${res.roomId}`);
     } finally {
       setProfileBusy(false);
+      setStartingChatId(null);
     }
   };
 
@@ -1113,10 +1129,18 @@ export function ChatPage() {
     );
   }
 
+  const directPeerIds = new Set(
+    rooms
+      .filter((r) => r.type === 'DIRECT')
+      .flatMap((r) => r.members.map((m) => m.userId))
+      .filter((id) => id !== user?.id)
+  );
+  const unchattedPeople = hostelTravellers.filter((t) => !directPeerIds.has(t.userId));
+
   // Room List View
   return (
     <TravellerLayout>
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div>
             <h1 className="text-[22px] font-extrabold text-[#111c2d] tracking-tight">Hostel Chat</h1>
@@ -1135,7 +1159,7 @@ export function ChatPage() {
           <div className="py-12 flex justify-center text-slate-400">
             <CircleNotch className="w-6 h-6 animate-spin" />
           </div>
-        ) : rooms.length === 0 ? (
+        ) : rooms.length === 0 && unchattedPeople.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#e0bfb8]/35 p-10 text-center shadow-xs">
             <div className="w-12 h-12 rounded-2xl bg-[#f0f3ff] text-[#14241E] flex items-center justify-center mx-auto mb-3">
               <ChatCircleDots weight="duotone" className="w-6 h-6" />
@@ -1152,62 +1176,126 @@ export function ChatPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {rooms.map((room) => {
-              const roomHasOnline =
-                room.type === 'DIRECT'
-                  ? room.members.some(
-                      (m) => m.userId !== user?.id && onlineUserIds.has(m.userId)
-                    )
-                  : room.members.some(
-                      (m) => m.userId !== user?.id && onlineUserIds.has(m.userId)
-                    );
-              return (
-                <button
-                  key={room._id}
-                  type="button"
-                  onClick={() => navigate(`/app/chat/${room._id}`)}
-                  className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center gap-3 active:scale-[0.99]"
-                >
-                  <div className="relative shrink-0">
-                    {room.type === 'GROUP' && !room.avatar ? (
-                      <div className="w-11 h-11 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center">
-                        <UsersThree weight="duotone" className="w-6 h-6" />
+          <div className="space-y-5">
+            {rooms.length > 0 && (
+              <div className="space-y-2.5">
+                {rooms.map((room) => {
+                  const roomHasOnline = room.members.some(
+                    (m) => m.userId !== user?.id && onlineUserIds.has(m.userId)
+                  );
+                  return (
+                    <button
+                      key={room._id}
+                      type="button"
+                      onClick={() => navigate(`/app/chat/${room._id}`)}
+                      className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center gap-3 active:scale-[0.99]"
+                    >
+                      <div className="relative shrink-0">
+                        {room.type === 'GROUP' && !room.avatar ? (
+                          <div className="w-11 h-11 rounded-2xl bg-[#14241E] text-emerald-300 flex items-center justify-center">
+                            <UsersThree weight="duotone" className="w-6 h-6" />
+                          </div>
+                        ) : (
+                          <Avatar src={room.avatar} name={room.name} className="w-11 h-11 rounded-2xl" />
+                        )}
+                        {roomHasOnline && (
+                          <span
+                            title="Online"
+                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
+                          />
+                        )}
                       </div>
-                    ) : (
-                      <Avatar src={room.avatar} name={room.name} className="w-11 h-11 rounded-2xl" />
-                    )}
-                    {roomHasOnline && (
-                      <span
-                        title="Online"
-                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
-                      />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-extrabold text-[#111c2d] truncate">{room.name}</p>
-                      <span className="text-[10px] font-semibold text-slate-400 shrink-0">
-                        {new Date(room.lastMessageAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <p className="text-xs text-[#59413c] truncate">
-                        {room.lastMessageText || 'Tap to start chatting'}
-                      </p>
-                      {(room.unreadCount ?? 0) > 0 && (
-                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#a93017] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
-                          {room.unreadCount! > 99 ? '99+' : room.unreadCount}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-extrabold text-[#111c2d] truncate">{room.name}</p>
+                          <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                            {new Date(room.lastMessageAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <p className="text-xs text-[#59413c] truncate">
+                            {room.lastMessageText || 'Tap to start chatting'}
+                          </p>
+                          {(room.unreadCount ?? 0) > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#a93017] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                              {room.unreadCount! > 99 ? '99+' : room.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {unchattedPeople.length > 0 && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#59413c]">
+                    People Here · Say Hi ({unchattedPeople.length})
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+                  {unchattedPeople.map((t) => {
+                    const isOnline = Boolean(t.isOnline || onlineUserIds.has(t.userId));
+                    const starting = startingChatId === t.userId;
+                    return (
+                      <button
+                        key={t.userId}
+                        type="button"
+                        disabled={startingChatId !== null}
+                        onClick={() => startDirectChat(t.userId)}
+                        className="w-full text-left bg-white rounded-2xl border border-[#e0bfb8]/35 p-3.5 shadow-2xs hover:shadow-sm transition flex items-center justify-between gap-3 active:scale-[0.99] disabled:opacity-70"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative shrink-0">
+                            <Avatar
+                              src={t.avatar}
+                              name={t.nickname}
+                              className="w-11 h-11 rounded-2xl"
+                            />
+                            {isOnline && (
+                              <span
+                                title="Online"
+                                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
+                              />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-extrabold text-[#111c2d] truncate">
+                                {t.nickname}
+                              </p>
+                              {isOnline && (
+                                <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                                  Online
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#59413c] truncate">
+                              Tap to start chatting
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f0f3ff] text-[#14241E] text-[11px] font-bold">
+                          {starting ? (
+                            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <ChatCircleDots weight="duotone" className="w-3.5 h-3.5 text-[#a93017]" />
+                          )}
+                          {starting ? 'Opening...' : 'Chat'}
                         </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
